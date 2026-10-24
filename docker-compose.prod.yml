@@ -1,0 +1,19 @@
+# Демо-стенд на внешнем сервере. Запуск:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+# Наружу открыт только порт 80 (веб + /api + /docs через nginx). Нужен Docker Compose 2.24+.
+x-prod-env: &prod-env
+  APP_ENV: production
+  JWT_SECRET: ${JWT_SECRET:?Задайте JWT_SECRET в файле .env}
+
+services:
+  web:
+    ports: !override ["80:8080"]
+  api:
+    ports: !reset []
+    environment: *prod-env
+  worker:
+    environment: *prod-env
+  migrate:
+    environment: *prod-env
+  mocks:
+    ports: !reset []

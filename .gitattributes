@@ -1,0 +1,5 @@
+# Переводы строк в репозитории и на диске — LF на любой ОС: shell-скрипты с CRLF не запускаются в Linux
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.ico binary

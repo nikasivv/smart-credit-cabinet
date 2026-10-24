@@ -1,0 +1,13 @@
+[project]
+name = "smart-credit-cabinet"
+version = "1.0.0"
+description = "Цифровой кредитный конвейер для малого и микробизнеса"
+requires-python = ">=3.12,<3.13"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"

@@ -1,0 +1,84 @@
+erDiagram
+  companies ||--o{ users : "сотрудники"
+  companies ||--o{ applications : "заявки"
+  users ||--o{ applications : "заявитель / аналитик"
+  applications ||--o{ application_events : "журнал"
+  applications ||--o{ documents : "документы"
+  applications ||--o{ info_requests : "дозапросы"
+  applications ||--o{ jobs : "задачи конвейера"
+  companies {
+    int id PK
+    string inn UK
+    string name
+    string legal_form
+    string okved
+    string region
+  }
+  users {
+    int id PK
+    string email UK
+    string password_hash
+    string full_name
+    string role
+    int company_id FK
+  }
+  applications {
+    uuid id PK
+    string number UK
+    int company_id FK
+    int applicant_id FK
+    int analyst_id FK
+    string product_code
+    string purpose
+    bigint amount
+    int term_months
+    bigint revenue_last_year
+    bigint monthly_debt_payments
+    string status
+    int version
+    json enrichment
+    json scoring
+    json decision
+    json offer
+    string idempotency_key UK
+  }
+  application_events {
+    int id PK
+    uuid application_id FK
+    string kind
+    string from_status
+    string to_status
+    string actor_type
+    int actor_id
+    text message
+    json payload
+    bool visible_to_client
+    timestamptz created_at
+  }
+  documents {
+    int id PK
+    uuid application_id FK
+    string doc_type
+    string filename
+    int size
+    string sha256
+    bytea content
+  }
+  info_requests {
+    int id PK
+    uuid application_id FK
+    string requested_by_type
+    text message
+    json items
+    text response_text
+    string status
+  }
+  jobs {
+    int id PK
+    string kind
+    uuid application_id FK
+    string status
+    int attempts
+    timestamptz run_after
+    text last_error
+  }

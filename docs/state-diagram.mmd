@@ -1,0 +1,31 @@
+stateDiagram-v2
+    [*] --> DRAFT
+    DRAFT --> SUBMITTED : client
+    DRAFT --> CANCELLED : client
+    SUBMITTED --> VALIDATION : system
+    VALIDATION --> NEEDS_INFO : system
+    VALIDATION --> ENRICHMENT : system
+    ENRICHMENT --> SCORING : system
+    ENRICHMENT --> NEEDS_INFO : system
+    ENRICHMENT --> MANUAL_REVIEW : system
+    SCORING --> APPROVED : system
+    SCORING --> COUNTER_OFFER : system
+    SCORING --> REJECTED : system
+    SCORING --> MANUAL_REVIEW : system
+    NEEDS_INFO --> SUBMITTED : client
+    NEEDS_INFO --> CANCELLED : client
+    MANUAL_REVIEW --> APPROVED : analyst
+    MANUAL_REVIEW --> COUNTER_OFFER : analyst
+    MANUAL_REVIEW --> REJECTED : analyst
+    MANUAL_REVIEW --> NEEDS_INFO : analyst
+    MANUAL_REVIEW --> CANCELLED : client
+    APPROVED --> OFFER_ACCEPTED : client
+    APPROVED --> CANCELLED : client
+    COUNTER_OFFER --> OFFER_ACCEPTED : client
+    COUNTER_OFFER --> CANCELLED : client
+    OFFER_ACCEPTED --> SIGNED : client
+    OFFER_ACCEPTED --> CANCELLED : client
+    SIGNED --> ISSUED : system
+    CANCELLED --> [*]
+    ISSUED --> [*]
+    REJECTED --> [*]

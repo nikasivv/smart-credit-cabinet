@@ -1,0 +1,29 @@
+flowchart TB
+  UI["Браузер: кабинет клиента и рабочее место аналитика<br/>HTML + CSS + TypeScript"]
+  NG["web — nginx<br/>статика, reverse proxy, CSP"]
+  UI -->|"/api"| NG
+  NG --> API
+
+  subgraph Core["Кредитный конвейер (Python 3.12)"]
+    direction LR
+    API["api — FastAPI<br/>REST · JWT · RBAC<br/>валидация · идемпотентность"]
+    DOM["Доменное ядро<br/>машина состояний · скоринг<br/>кредитная политика · офферы"]
+    W["worker × N<br/>очередь задач · retry"]
+    API --> DOM
+    W --> DOM
+  end
+
+  DB[("PostgreSQL<br/>заявки · журнал событий · документы · очередь jobs")]
+  API -->|"статус + событие + задача<br/>в одной транзакции"| DB
+  W -->|"SELECT … FOR UPDATE SKIP LOCKED"| DB
+
+  subgraph Ext["Внешние источники — симулятор mocks"]
+    direction LR
+    EG["ЕГРЮЛ / ЕГРИП"]
+    FNS["ФНС «Прозрачный бизнес»"]
+    BKI["Бюро кредитных историй"]
+  end
+  W -->|"retry + circuit breaker<br/>сбой → ручное рассмотрение"| Ext
+
+  LLM["Ollama + Qwen2.5 1.5B<br/>открытые веса, профиль ai"]
+  API -.->|"цель из свободного текста,<br/>фолбэк — правила"| LLM

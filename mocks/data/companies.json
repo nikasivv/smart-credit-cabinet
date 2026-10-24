@@ -1,0 +1,78 @@
+{
+  "7708123450": {
+    "persona": "Сильная компания — автоматическое одобрение",
+    "egrul": {"name": "ООО «Северная пекарня»", "legal_form": "OOO", "ogrn": "1187746312455", "status": "ACTIVE",
+              "registered_months_ago": 103, "okved": "10.71", "okved_name": "Производство хлеба и хлебобулочных изделий",
+              "region": "Москва", "address": "г. Москва, ул. Сельскохозяйственная, д. 17, стр. 2",
+              "director": {"name": "Миронова Ольга Сергеевна", "disqualified": false},
+              "founders": [{"name": "Миронова Ольга Сергеевна", "share": 0.6}, {"name": "Миронов Павел Андреевич", "share": 0.4}]},
+    "fns": {"revenue": {"2025": 48000000, "2024": 41000000}, "tax_arrears": 0, "mass_address": false,
+            "employees": 34, "tax_regime": "ОСН"},
+    "bki": {"inquiries_30d": 1, "obligations": [
+      {"creditor": "Банк «Восток»", "type": "Лизинг оборудования", "amount": 4200000, "balance": 2100000,
+       "monthly_payment": 80000, "max_overdue_days_12m": 0, "current_overdue": 0}]}
+  },
+  "500100732259": {
+    "persona": "Молодой ИП с небольшими просрочками — ручное рассмотрение",
+    "egrul": {"name": "ИП Смирнова Анна Викторовна", "legal_form": "IP", "ogrn": "325500100012344", "status": "ACTIVE",
+              "registered_months_ago": 10, "okved": "56.30", "okved_name": "Подача напитков",
+              "region": "Московская область", "address": "Московская обл., г. Химки, ул. Ленинградская, д. 4",
+              "director": {"name": "Смирнова Анна Викторовна", "disqualified": false}, "founders": []},
+    "fns": {"revenue": {"2025": 9600000}, "tax_arrears": 0, "mass_address": false, "employees": 6, "tax_regime": "УСН 6%"},
+    "bki": {"inquiries_30d": 3, "obligations": [
+      {"creditor": "Банк «Северный»", "type": "Кредитная карта", "amount": 500000, "balance": 310000,
+       "monthly_payment": 25000, "max_overdue_days_12m": 12, "current_overdue": 0}]}
+  },
+  "5027146895": {
+    "persona": "Высокие платежи по текущим кредитам — встречное предложение с увеличенным сроком",
+    "egrul": {"name": "ООО «ТрансЛогистик»", "legal_form": "OOO", "ogrn": "1165027009871", "status": "ACTIVE",
+              "registered_months_ago": 118, "okved": "49.41", "okved_name": "Деятельность автомобильного грузового транспорта",
+              "region": "Московская область", "address": "Московская обл., г. Люберцы, Октябрьский пр-т, д. 112",
+              "director": {"name": "Белов Николай Петрович", "disqualified": false},
+              "founders": [{"name": "Белов Николай Петрович", "share": 1.0}]},
+    "fns": {"revenue": {"2025": 62000000, "2024": 58000000}, "tax_arrears": 0, "mass_address": false,
+            "employees": 41, "tax_regime": "ОСН"},
+    "bki": {"inquiries_30d": 2, "obligations": [
+      {"creditor": "Банк «Центр»", "type": "Кредит на транспорт", "amount": 6000000, "balance": 3800000,
+       "monthly_payment": 120000, "max_overdue_days_12m": 0, "current_overdue": 0},
+      {"creditor": "Лизинговая компания «Дорога»", "type": "Лизинг тягачей", "amount": 2400000, "balance": 1300000,
+       "monthly_payment": 50000, "max_overdue_days_12m": 0, "current_overdue": 0}]}
+  },
+  "7816039573": {
+    "persona": "Компания в ликвидации — отказ по стоп-фактору",
+    "egrul": {"name": "ООО «Вектор Строй»", "legal_form": "OOO", "ogrn": "1137847115620", "status": "LIQUIDATING",
+              "registered_months_ago": 150, "okved": "41.20", "okved_name": "Строительство жилых и нежилых зданий",
+              "region": "Санкт-Петербург", "address": "г. Санкт-Петербург, ул. Салова, д. 27",
+              "director": {"name": "Кузнецов Сергей Игоревич", "disqualified": false},
+              "founders": [{"name": "Кузнецов Сергей Игоревич", "share": 1.0}]},
+    "fns": {"revenue": {"2025": 21000000, "2024": 35000000}, "tax_arrears": 420000, "mass_address": false,
+            "employees": 12, "tax_regime": "ОСН"},
+    "bki": {"inquiries_30d": 6, "obligations": [
+      {"creditor": "Банк «Нева»", "type": "Оборотный кредит", "amount": 5000000, "balance": 4100000,
+       "monthly_payment": 260000, "max_overdue_days_12m": 45, "current_overdue": 260000}]}
+  },
+  "6623018470": {
+    "persona": "Выручка в заявке выше данных ФНС — дозапрос отчётности, затем встречное предложение",
+    "egrul": {"name": "ООО «Агро Плюс»", "legal_form": "OOO", "ogrn": "1196658032117", "status": "ACTIVE",
+              "registered_months_ago": 80, "okved": "01.11", "okved_name": "Выращивание зерновых культур",
+              "region": "Свердловская область", "address": "Свердловская обл., г. Нижний Тагил, ул. Полевая, д. 3",
+              "director": {"name": "Ершов Виктор Михайлович", "disqualified": false},
+              "founders": [{"name": "Ершов Виктор Михайлович", "share": 1.0}]},
+    "fns": {"revenue": {"2025": 18000000, "2024": 17000000}, "tax_arrears": 0, "mass_address": false,
+            "employees": 15, "tax_regime": "ЕСХН"},
+    "bki": {"inquiries_30d": 1, "obligations": [
+      {"creditor": "Банк «Урал»", "type": "Кредит на технику", "amount": 1200000, "balance": 400000,
+       "monthly_payment": 30000, "max_overdue_days_12m": 0, "current_overdue": 0}]}
+  },
+  "2310045622": {
+    "persona": "Сумма выше лимита автоматического решения — ручное рассмотрение",
+    "egrul": {"name": "ООО «Код и Цифра»", "legal_form": "OOO", "ogrn": "1172310004561", "status": "ACTIVE",
+              "registered_months_ago": 92, "okved": "62.01", "okved_name": "Разработка компьютерного программного обеспечения",
+              "region": "Краснодарский край", "address": "г. Краснодар, ул. Красная, д. 176",
+              "director": {"name": "Орлов Дмитрий Алексеевич", "disqualified": false},
+              "founders": [{"name": "Орлов Дмитрий Алексеевич", "share": 0.5}, {"name": "Лебедева Ирина Олеговна", "share": 0.5}]},
+    "fns": {"revenue": {"2025": 140000000, "2024": 118000000}, "tax_arrears": 0, "mass_address": false,
+            "employees": 87, "tax_regime": "ОСН"},
+    "bki": {"inquiries_30d": 0, "obligations": []}
+  }
+}
