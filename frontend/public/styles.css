@@ -30,6 +30,8 @@ h1 { font-size: clamp(1.6rem, 1.2rem + 1.6vw, 2.3rem); font-weight: 750; }
 h2 { font-size: 1.25rem; font-weight: 700; }
 h3 { font-size: 1.05rem; font-weight: 650; }
 p { margin: 0 0 .75em; max-width: 70ch; }
+/* Короткие подсказки и плашки — во всю ширину блока, без раннего переноса */
+.hint, .notice, .feed-profile { max-width: none; }
 a { color: var(--ink); text-underline-offset: 3px; }
 :focus-visible { outline: 3px solid var(--bank); outline-offset: 2px; border-radius: 4px; }
 .skip { position: absolute; left: -999px; } .skip:focus { left: 12px; top: 12px; background: var(--surface); padding: 8px; z-index: 10; }
