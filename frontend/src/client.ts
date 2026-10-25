@@ -69,6 +69,8 @@ interface Draft {
   collateral_value: number | null; comment: string; appId: string | null; key: string; suggestion: Suggestion | null;
   /** Текст, по которому получена suggestion: если клиент его поменял, разбираем заново */
   suggestedText: string;
+  /** Клиент отметил, что бизнес только начинается и выручки ещё нет */
+  noRevenue: boolean;
 }
 
 const STEPS = ["Цель", "Продукт", "О бизнесе", "Документы", "Проверка"];
@@ -86,7 +88,7 @@ export async function wizard(root: HTMLElement, user: User, query: URLSearchPara
   const d: Draft = {
     purpose: null, text: "", product: query.get("product"), amount: query.get("amount") ? Number(query.get("amount")) : null,
     term: null, revenue_last: null, revenue_prev: null, debt: null, collateral_type: null, collateral_value: null,
-    comment: "", appId: null, key: uuid(), suggestion: null, suggestedText: "",
+    comment: "", appId: null, key: uuid(), suggestion: null, suggestedText: "", noRevenue: false,
   };
   let step = d.product ? 1 : 0;
   if (d.product) d.purpose = cat.products.find((p) => p.code === d.product)?.purposes[0] ?? null;
@@ -245,13 +247,37 @@ export async function wizard(root: HTMLElement, user: User, query: URLSearchPara
       d.revenue_last = readMoney(rl); d.revenue_prev = readMoney(rp); d.debt = readMoney(debt) ?? 0; d.comment = comment.value;
       d.collateral_type = cType.value || null; d.collateral_value = readMoney(cValue);
     };
+    // Бизнес без выручки: вместо ошибки в поле — честное объяснение и что можно сделать
+    const startup = h("input", { type: "checkbox", id: "no-revenue", checked: d.noRevenue });
+    startup.addEventListener("change", () => { save(); d.noRevenue = startup.checked; render(); });
+    const startupToggle = h("label", { class: "check", for: "no-revenue" }, startup,
+      h("span", {}, "Бизнес только начинается — выручки ещё нет"));
+    const company = h("div", { class: "company-card" },
+      h("strong", {}, user.company?.name ?? ""), h("span", {}, `ИНН ${user.company?.inn} · ${user.company?.okved_name ?? ""}`),
+      h("span", { class: "hint" }, "Регистрационные данные банк проверит в ЕГРЮЛ/ЕГРИП сам — вводить их не нужно."));
+    if (d.noRevenue) {
+      return h("div", {},
+        h("h2", {}, "О бизнесе"), company, startupToggle,
+        h("section", { class: "startup-note", role: "status" },
+          h("h3", {}, "Без выручки банк пока не сможет выдать кредит"),
+          h("p", {}, "Кредит бизнес возвращает из выручки, и по ней банк оценивает, по силам ли платежи. ",
+            "Когда выручки ещё нет, оценивать не по чему, поэтому кредиты в кабинете доступны бизнесу, ",
+            "который работает не меньше 3 месяцев и уже зарабатывает."),
+          h("p", { class: "startup-sub" }, "Что можно сделать сейчас"),
+          h("ul", {},
+            h("li", {}, "Вернуться, когда появится выручка — хватит и нескольких месяцев работы: укажите выручку за всё время, банк оценит заявку по ней."),
+            h("li", {}, "Узнать о программах для начинающих предпринимателей: льготные микрозаймы и гранты дают региональные фонды поддержки и центры «Мой бизнес».")),
+          h("p", { class: "hint" }, "Если выручка всё-таки есть, снимите отметку выше и укажите её — даже небольшую.")),
+        h("div", { class: "wizard-nav" },
+          h("button", { type: "button", class: "btn btn-ghost", onclick: () => { step--; render(); } }, "Назад"),
+          h("a", { class: "btn btn-secondary", href: "#/" }, "Вернуться на главную")));
+    }
     return h("div", {},
       h("h2", {}, "О бизнесе"),
-      h("div", { class: "company-card" },
-        h("strong", {}, user.company?.name ?? ""), h("span", {}, `ИНН ${user.company?.inn} · ${user.company?.okved_name ?? ""}`),
-        h("span", { class: "hint" }, "Регистрационные данные банк проверит в ЕГРЮЛ/ЕГРИП сам — вводить их не нужно.")),
+      company,
+      startupToggle,
       h("div", { class: "two-col" },
-        field("Выручка за 2025 год", rl, "В рублях, полностью — из декларации или отчётности", "revenue_last_year"),
+        field("Выручка за 2025 год", rl, "В рублях, полностью. Если бизнес открылся недавно — за всё время работы", "revenue_last_year"),
         field("Выручка за 2024 год", rp, "Если бизнес моложе — оставьте пустым", "revenue_prev_year")),
       field("Платежи по текущим кредитам и лизингу в месяц", debt, "0, если кредитов нет", "monthly_debt_payments"),
       p.requires_collateral ? h("div", { class: "two-col" },

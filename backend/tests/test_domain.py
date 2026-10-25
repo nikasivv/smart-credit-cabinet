@@ -77,7 +77,8 @@ def test_sanity_catches_typos_in_figures():
         return {(i.field, i.code) for i in sanity_check(ApplicationData(**base))}
     assert codes() == set()
     assert ("revenue_last_year", "implausible") in codes(revenue_last_year=13)              # ввели в миллионах
-    assert ("revenue_prev_year", "implausible") in codes(revenue_prev_year=41_000)
+    assert ("revenue_prev_year", "implausible") in codes(revenue_prev_year=4_100)
+    assert codes(revenue_last_year=60_000, monthly_debt_payments=0) == set()             # маленький ИП — рассматриваем
     assert codes(revenue_prev_year=0) == set()                                               # новый бизнес — можно 0
     assert ("monthly_debt_payments", "exceeds_revenue") in codes(monthly_debt_payments=122_121_122)
     assert codes(revenue_last_year=None, monthly_debt_payments=None) == set()               # пустое — не сюда

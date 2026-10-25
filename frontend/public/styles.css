@@ -87,6 +87,13 @@ textarea.input { min-height: 0; resize: vertical; }
 .panel-good { background: var(--good-soft); border-color: transparent; }
 details.panel > summary, details > summary { cursor: pointer; font-weight: 600; }
 .notice { background: var(--surface-2); padding: 12px 16px; border-radius: var(--radius-sm); }
+/* Бизнес без выручки: объяснение вместо формы */
+.startup-note { background: var(--attn-soft); border-radius: var(--radius-sm); padding: 18px 20px; margin: 4px 0 8px; }
+.startup-note h3 { font-size: 1.05rem; margin-bottom: .4em; }
+.startup-note p { margin: 0 0 .6em; }
+.startup-note .startup-sub { font-weight: 650; margin: .9em 0 .3em; }
+.startup-note ul { margin: 0 0 .8em; padding-left: 20px; display: grid; gap: 6px; }
+.wizard-nav .btn { white-space: nowrap; }
 .notice-bad { background: var(--bad-soft); color: var(--bad); }
 .lead { color: var(--muted); font-size: 1.05rem; }
 .back { display: inline-block; color: var(--muted); margin-bottom: 12px; font-size: .95rem; text-decoration: none; }
