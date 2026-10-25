@@ -92,6 +92,7 @@ export function clearErrors(scope: HTMLElement): void {
   const box = scope.querySelector<HTMLElement>(".form-error");
   if (box) box.hidden = true;
   scope.querySelectorAll(".field").forEach((f) => f.classList.remove("has-error"));
+  scope.querySelectorAll(".field-error").forEach((e) => (e.textContent = ""));
 }
 
 export function toast(message: string, kind: "ok" | "error" = "ok"): void {

@@ -87,6 +87,15 @@ def download_document(app_id: str, doc_id: int, db: Session = Depends(get_db), u
                     headers={"Content-Disposition": f'attachment; filename="document-{doc.id}"'})
 
 
+@router.delete("/applications/{app_id}/documents/{doc_id}", status_code=204,
+               summary="Удалить ошибочно загруженный документ (черновик или дозапрос)")
+def delete_document(app_id: str, doc_id: int, db: Session = Depends(get_db), user: User = Depends(client_only)):
+    app = svc.get_for_client(db, user, app_id)
+    svc.delete_document(db, user, app, doc_id)
+    commit(db)
+    return Response(status_code=204)
+
+
 @router.post("/applications/{app_id}/info-response", response_model=ApplicationOut,
              summary="Ответить на запрос банка и вернуть заявку на рассмотрение")
 def info_response(app_id: str, body: InfoResponseIn, db: Session = Depends(get_db),

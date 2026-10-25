@@ -44,6 +44,7 @@
 | `POST /api/applications/{id}/submit` | клиент | Отправить в банк |
 | `POST /api/applications/{id}/documents` | клиент | Загрузить документ (multipart: `doc_type`, `file`) |
 | `GET /api/applications/{id}/documents/{doc_id}` | клиент | Скачать документ |
+| `DELETE /api/applications/{id}/documents/{doc_id}` | клиент | Удалить ошибочно загруженный документ: только в черновике и при дозапросе (иначе 409). Запись об удалении остаётся в журнале |
 | `POST /api/applications/{id}/info-response` | клиент | Ответить на дозапрос, заявка возвращается в конвейер |
 | `POST /api/applications/{id}/accept` | клиент | Принять предложение, формируется договор |
 | `POST /api/applications/{id}/sign` | клиент | Подписать (`confirmation_inn`, `agree: true`), запускается выдача |

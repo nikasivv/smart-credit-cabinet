@@ -94,6 +94,7 @@ export const api = {
     const fd = new FormData(); fd.append("doc_type", docType); fd.append("file", file);
     return request<Doc>("POST", `/api/applications/${id}/documents`, fd);
   },
+  deleteDocument: (id: string, docId: number) => request<null>("DELETE", `/api/applications/${id}/documents/${docId}`),
   infoResponse: (id: string, body: Record<string, unknown>) => request<Application>("POST", `/api/applications/${id}/info-response`, body),
   accept: (id: string) => request<Application>("POST", `/api/applications/${id}/accept`),
   sign: (id: string, confirmation_inn: string) => request<Application>("POST", `/api/applications/${id}/sign`, { confirmation_inn, agree: true }),

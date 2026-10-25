@@ -1,7 +1,7 @@
 // Рабочее место кредитного аналитика.
 
 import { AnalystCard, api, QueueItem, User } from "./api.js";
-import { catalog, Cleanup } from "./client.js";
+import { catalog, Cleanup, collateralText } from "./client.js";
 import {
   actionButton, clearErrors, dateTime, emptyState, field, h, money, moneyInput, moneyShort, months, mount, readMoney,
   schedule, showErrors, statusPill, toast,
@@ -216,6 +216,7 @@ export async function reviewPage(root: HTMLElement, user: User, id: string): Pro
         h("dt", {}, "Цель"), h("dd", {}, purpose, app.purpose_comment ? ` — ${app.purpose_comment}` : ""),
         h("dt", {}, "Сумма и срок"), h("dd", {}, `${money(app.amount)}, ${months(app.term_months)}`),
         h("dt", {}, "Платежи по кредитам (со слов клиента)"), h("dd", {}, money(app.monthly_debt_payments)),
+        app.collateral_type || app.collateral_value ? [h("dt", {}, "Залог"), h("dd", {}, collateralText(app.collateral_type, app.collateral_value))] : null,
         h("dt", {}, "Документы"), h("dd", {}, app.documents.length ? app.documents.map((d) => `${cat.documents[d.doc_type] ?? d.doc_type} (${d.filename})`).join("; ") : "нет")));
   }
 

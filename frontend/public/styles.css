@@ -5,6 +5,7 @@
   --good: #1E8A4C; --good-soft: #E5F4EB; --attn: #9A5A00; --attn-soft: #FFF3DF; --bad: #C62828; --bad-soft: #FDECEC;
   --radius: 14px; --radius-sm: 8px;
   --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%235F6670' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   color-scheme: light;
 }
 /* Тёмная тема: по системной настройке, если пользователь не выбрал светлую, или по явному выбору */
@@ -13,6 +14,7 @@
     --bg: #121316; --surface: #1C1E22; --surface-2: #23262B; --ink: #ECEEF1; --muted: #A2A9B3; --line: #33373D;
     --red: #FF4A3D; --red-ink: #FF7A70; --bank: #9C8BFF; --bank-soft: #2A2546;
     --good: #4CC27F; --good-soft: #17301F; --attn: #F0B45A; --attn-soft: #352713; --bad: #FF6B6B; --bad-soft: #3A1C1C;
+    --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23A2A9B3' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
     color-scheme: dark;
   }
 }
@@ -20,6 +22,7 @@
   --bg: #121316; --surface: #1C1E22; --surface-2: #23262B; --ink: #ECEEF1; --muted: #A2A9B3; --line: #33373D;
   --red: #FF4A3D; --red-ink: #FF7A70; --bank: #9C8BFF; --bank-soft: #2A2546;
   --good: #4CC27F; --good-soft: #17301F; --attn: #F0B45A; --attn-soft: #352713; --bad: #FF6B6B; --bad-soft: #3A1C1C;
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23A2A9B3' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -159,14 +162,21 @@ td.neg { color: var(--bad); font-weight: 600; }
 .checklist { padding-left: 0; list-style: none; display: grid; gap: 6px; margin: 8px 0 16px; }
 .checklist li::before { content: "○"; margin-right: 8px; color: var(--attn); }
 .checklist li.ok::before { content: "✓"; color: var(--good); }
-.doc-list { padding-left: 18px; font-size: .93rem; }
+.doc-list { list-style: none; padding: 0; margin: 12px 0 0; display: grid; gap: 8px; font-size: .93rem; }
+.doc-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.doc-list .doc-name { min-width: 0; overflow-wrap: anywhere; }
+.btn-link.doc-remove { flex: none; color: var(--bad); }
 .upload-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 12px; align-items: start; margin-top: 16px; }
 .label-spacer { display: block; font-weight: 600; margin-bottom: 6px; }
 .upload-action .btn { min-height: 46px; }
 input[type="file"].input { padding: 7px 10px; }
 input[type="file"].input::file-selector-button { font: inherit; font-weight: 600; color: var(--ink); background: var(--surface-2);
   border: 1px solid var(--line); border-radius: 999px; padding: 5px 14px; margin-right: 12px; cursor: pointer; }
-select.input option { padding: 8px 12px; }
+/* Выпадающий список в стиле остальных полей: своя стрелка вместо системной, одинаковая в обеих темах */
+select.input { appearance: none; -webkit-appearance: none; padding-right: 40px; cursor: pointer;
+  background-image: var(--chevron); background-repeat: no-repeat; background-position: right 14px center; background-size: 12px 8px; }
+select.input option { padding: 8px 12px; background: var(--surface); color: var(--ink); }
 .docs { margin-bottom: 8px; }
 
 /* Маршрут заявки — главный элемент карточки */
@@ -262,6 +272,9 @@ select.input option { padding: 8px 12px; }
 .toast-error { background: var(--bad); color: #fff; }
 
 @media (max-width: 860px) {
+  /* На телефоне шапка прокручивается вместе со страницей. Закреплённая шапка в iOS Safari после клавиатуры
+     или при свёрнутой адресной строке съезжает вниз и наезжает на содержимое */
+  .topbar { position: static; }
   .grid-main, .review-grid, .login, .sources, .two-col, .upload-row { grid-template-columns: minmax(0, 1fr); }
   .review-side { position: static; }
   .route { grid-template-columns: repeat(5, minmax(0, 1fr)); }

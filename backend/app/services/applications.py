@@ -191,6 +191,20 @@ def add_document(db: Session, user: User, app: Application, doc_type: str, filen
     return doc
 
 
+def delete_document(db: Session, user: User, app: Application, doc_id: int) -> None:
+    """Клиент убирает ошибочно загруженный файл. Пока банк не начал рассмотрение — в черновике и при дозапросе.
+    Сам файл удаляется, а запись в журнале остаётся: кто, когда и какой документ убрал."""
+    doc = next((d for d in app.documents if d.id == doc_id), None)
+    if doc is None:
+        raise NotFound("Документ не найден")
+    if app.status not in (Status.DRAFT.value, Status.NEEDS_INFO.value):
+        raise Conflict("Удалить документ нельзя: банк уже рассматривает заявку", code="not_editable")
+    app.documents.remove(doc)
+    db.delete(doc)
+    log_event(db, app, "DOCUMENT", Actor.CLIENT, user.id, f"Удалён документ: {DOCUMENTS.get(doc.doc_type, doc.doc_type)}",
+              {"doc_type": doc.doc_type, "filename": doc.filename})
+
+
 def open_info_request(db: Session, app: Application) -> InfoRequest | None:
     return db.scalar(select(InfoRequest).where(InfoRequest.application_id == app.id, InfoRequest.status == "OPEN")
                      .order_by(InfoRequest.id.desc()))

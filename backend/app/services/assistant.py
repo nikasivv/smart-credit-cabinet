@@ -22,7 +22,8 @@ import httpx
 
 from ..config import get_settings
 from ..domain.products import PRODUCTS, PURPOSES
-from ..domain.recommend import amount_from_text, mentions_amount, purpose_from_text, purpose_scores, recommend
+from ..domain.recommend import (amount_from_text, mentions_amount, purpose_from_text, purpose_scores, recommend,
+                               term_from_text)
 
 log = logging.getLogger("scc.assistant")
 _status_cache: dict[str, tuple[float, bool]] = {}
@@ -87,11 +88,12 @@ def suggest(text: str | None, purpose: str | None, amount: int | None) -> dict:
     term = None
     if text and not purpose:
         extracted = _llm_extract(text) if llm_available() else None
-        rule_purpose, rule_amount = purpose_from_text(text), amount_from_text(text)
+        rule_purpose, rule_amount, rule_term = purpose_from_text(text), amount_from_text(text), term_from_text(text)
         if extracted:
             source = "llm"
             purpose = extracted["purpose"]
-            term = extracted["term_months"] if re.search(r"мес|год|лет", text.lower()) else None
+            # Срок — тоже только если он назван; разбор по правилам точнее модели
+            term = rule_term or (extracted["term_months"] if re.search(r"мес|год|лет", text.lower()) else None)
             # Модель не должна противоречить явным словам в тексте: если правила нашли признаки другой цели,
             # а для выбранной моделью — ни одного, верим тексту
             if rule_purpose and rule_purpose != purpose and purpose_scores(text).get(purpose, 0) == 0:
@@ -104,6 +106,7 @@ def suggest(text: str | None, purpose: str | None, amount: int | None) -> dict:
             source = "rules"
             purpose = rule_purpose
             amount = amount or rule_amount
+            term = rule_term
     if not purpose:
         return {"source": source, "purpose": None, "amount": amount, "term_months": None, "recommendations": [],
                 "message": "Не получилось понять цель. Выберите её из списка или опишите подробнее, на что нужны деньги."}

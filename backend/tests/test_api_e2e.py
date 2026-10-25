@@ -169,6 +169,26 @@ def test_implausible_figures_rejected_on_save(client):
     assert client.get(f"/api/applications/{app['id']}", headers=h).json()["monthly_debt_payments"] == 80_000
 
 
+def test_client_deletes_wrong_document(client):
+    """Ошибочно загруженный файл можно убрать в черновике; после отправки — нельзя; чужой — не найти."""
+    h = login(client, "bakery@demo.ru")
+    app = create(client, h)
+    doc = client.post(f"/api/applications/{app['id']}/documents", data={"doc_type": "contract"}, files={"file": PDF}, headers=h).json()
+    other = login(client, "logistic@demo.ru")
+    assert client.delete(f"/api/applications/{app['id']}/documents/{doc['id']}", headers=other).status_code == 404
+    assert client.delete(f"/api/applications/{app['id']}/documents/{doc['id']}", headers=h).status_code == 204
+    a = client.get(f"/api/applications/{app['id']}", headers=h).json()
+    assert a["documents"] == []
+    events = [e["message"] for e in client.get(f"/api/applications/{app['id']}/events", headers=h).json()]
+    assert "Удалён документ: Договор или спецификация на покупку" in events
+    assert client.delete(f"/api/applications/{app['id']}/documents/{doc['id']}", headers=h).status_code == 404
+    # После отправки банк уже рассматривает заявку — документ не удалить
+    doc2 = client.post(f"/api/applications/{app['id']}/documents", data={"doc_type": "contract"}, files={"file": PDF}, headers=h).json()
+    client.post(f"/api/applications/{app['id']}/submit", headers=h)
+    r = client.delete(f"/api/applications/{app['id']}/documents/{doc2['id']}", headers=h)
+    assert r.status_code == 409
+
+
 def test_draft_optimistic_lock(client):
     h = login(client, "bakery@demo.ru")
     app = create(client, h)

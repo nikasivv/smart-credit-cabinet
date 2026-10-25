@@ -64,6 +64,24 @@ def amount_from_text(text: str) -> int | None:
     return None
 
 
+def term_from_text(text: str) -> int | None:
+    """Срок в месяцах: «на 18 месяцев», «на 2 года», «3 лет», «полгода», «полтора года», «на год».
+    Годы вроде «за 2025 год» отбрасываются — такой срок вне диапазона 1–120 мес."""
+    t = text.lower().replace("\u00a0", " ")
+    for m in re.finditer(r"(\d+(?:[.,]\d+)?)\s*(мес|год|лет)", t):
+        n = float(m.group(1).replace(",", "."))
+        months = round(n if m.group(2) == "мес" else n * 12)
+        if 1 <= months <= 120:
+            return months
+    if re.search(r"полтора\s+года|полутора\s+(?:лет|года)", t):
+        return 18
+    if re.search(r"пол\s*года", t):
+        return 6
+    if re.search(r"\bна\s+год\b", t):
+        return 12
+    return None
+
+
 def mentions_amount(text: str) -> bool:
     """Есть ли в тексте хоть какой-то признак суммы — цифры или слова-единицы."""
     t = text.lower()

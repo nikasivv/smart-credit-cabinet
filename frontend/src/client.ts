@@ -67,16 +67,26 @@ interface Draft {
   purpose: string | null; text: string; product: string | null; amount: number | null; term: number | null;
   revenue_last: number | null; revenue_prev: number | null; debt: number | null; collateral_type: string | null;
   collateral_value: number | null; comment: string; appId: string | null; key: string; suggestion: Suggestion | null;
+  /** Текст, по которому получена suggestion: если клиент его поменял, разбираем заново */
+  suggestedText: string;
 }
 
 const STEPS = ["Цель", "Продукт", "О бизнесе", "Документы", "Проверка"];
+
+/** Виды залога: код хранится в заявке, клиенту и сотрудникам показываем название */
+export const COLLATERAL: Record<string, string> = {
+  equipment: "Приобретаемое оборудование", vehicle: "Транспорт", real_estate: "Недвижимость",
+};
+export function collateralText(type: string | null, value: number | null): string {
+  return `${type ? COLLATERAL[type] ?? type : "—"}${value ? `, оценка ${money(value)}` : ""}`;
+}
 
 export async function wizard(root: HTMLElement, user: User, query: URLSearchParams): Promise<Cleanup> {
   const cat = await catalog();
   const d: Draft = {
     purpose: null, text: "", product: query.get("product"), amount: query.get("amount") ? Number(query.get("amount")) : null,
     term: null, revenue_last: null, revenue_prev: null, debt: null, collateral_type: null, collateral_value: null,
-    comment: "", appId: null, key: uuid(), suggestion: null,
+    comment: "", appId: null, key: uuid(), suggestion: null, suggestedText: "",
   };
   let step = d.product ? 1 : 0;
   if (d.product) d.purpose = cat.products.find((p) => p.code === d.product)?.purposes[0] ?? null;
@@ -95,40 +105,73 @@ export async function wizard(root: HTMLElement, user: User, query: URLSearchPara
   const product = (): Product => cat.products.find((p) => p.code === d.product)!;
 
   // --- Шаг 1: зачем деньги
+  // Карточка цели только выбирается; дальше — одной кнопкой «Далее». Если клиент описал задачу словами,
+  // сумму и срок из описания подставляем на шаге «Продукт», даже когда цель он выбрал карточкой.
   function stepPurpose(): HTMLElement {
     const text = h("textarea", { class: "input", rows: 3, maxlength: 1000, placeholder: "Например: нужно купить новую печь для пекарни, примерно 2,5 млн" });
     text.value = d.text;
     const result = h("div", { class: "suggestion" });
-    if (d.suggestion) renderSuggestion(result, d.suggestion);
+    if (d.suggestion && d.suggestedText && d.suggestedText === d.text) renderSuggestion(result, d.suggestion);
+    const cards = cat.purposes.map((p) =>
+      h("button", { type: "button", role: "radio", "aria-checked": String(d.purpose === p.code), "data-code": p.code,
+        class: `purpose ${d.purpose === p.code ? "selected" : ""}`, onclick: () => { d.purpose = p.code; mark(); clearErrors(root); } },
+        h("strong", {}, p.title), h("span", {}, p.hint)));
+    function mark(): void {
+      for (const c of cards) {
+        const on = c.dataset.code === d.purpose;
+        c.classList.toggle("selected", on); c.setAttribute("aria-checked", String(on));
+      }
+    }
+    text.addEventListener("input", () => { d.text = text.value; });
+    const understand = async (t: string): Promise<Suggestion> => {
+      if (d.suggestion && d.suggestedText === t) return d.suggestion;
+      d.suggestion = await api.suggest({ text: t });
+      d.suggestedText = t;
+      return d.suggestion;
+    };
     return h("div", {},
       h("h2", {}, "На что нужны деньги?"),
-      h("div", { class: "purpose-grid", role: "list" }, cat.purposes.map((p) =>
-        h("button", { type: "button", role: "listitem", class: `purpose ${d.purpose === p.code ? "selected" : ""}`,
-          onclick: async () => { d.purpose = p.code; d.text = ""; d.suggestion = await api.suggest({ purpose: p.code, amount: d.amount }); pickBest(); step = 1; render(); } },
-          h("strong", {}, p.title), h("span", {}, p.hint)))),
+      h("div", { class: "purpose-grid", role: "radiogroup", "aria-label": "Цель финансирования" }, cards),
       h("div", { class: "or" }, "или опишите своими словами"),
-      field("Ваша задача", text, "Определим цель и сумму и подберём продукт", "text"),
+      field("Ваша задача", text, "Определим цель, сумму и срок и подберём продукт", "text"),
       actionButton("Подобрать продукт", async () => {
-        if (!text.value.trim()) { text.focus(); return; }
-        d.text = text.value.trim();
-        const s = await api.suggest({ text: d.text });
-        d.suggestion = s;
+        const t = text.value.trim();
+        if (!t) { text.focus(); return; }
+        d.text = t;
+        clearErrors(root);
+        const s = await understand(t);
+        if (s.purpose) { d.purpose = s.purpose; mark(); }
         renderSuggestion(result, s);
       }, "btn btn-secondary"),
-      result);
+      result,
+      nav(undefined, async () => {
+        const t = text.value.trim();
+        d.text = t;
+        const fromText = t ? await understand(t) : null;
+        if (!d.purpose && fromText?.purpose) d.purpose = fromText.purpose;
+        if (!d.purpose) {
+          throw new ApiError(422, "purpose", fromText?.message ?? "Выберите цель или опишите задачу своими словами",
+            [{ field: "text", message: "Например: «нужно 2 млн на закупку товара на полгода»" }]);
+        }
+        if (fromText?.amount) d.amount = fromText.amount;
+        if (fromText?.term_months) d.term = fromText.term_months;
+        // Рекомендации — под выбранную цель (она могла отличаться от той, что поняли из текста)
+        if (!fromText || fromText.purpose !== d.purpose) d.suggestion = await api.suggest({ purpose: d.purpose, amount: d.amount });
+        d.product = null;
+        pickBest();
+      }));
   }
 
   function renderSuggestion(host: HTMLElement, s: Suggestion): void {
     if (!s.purpose) { host.replaceChildren(h("p", { class: "notice" }, s.message ?? "")); return; }
+    const facts = [s.amount ? `около ${moneyShort(s.amount)}` : "", s.term_months ? `на ${months(s.term_months)}` : ""].filter(Boolean).join(" ");
     host.replaceChildren(
-      h("p", { class: "suggest-head" }, `Понял задачу: ${s.purpose_title?.toLowerCase()}`, s.amount ? `, около ${moneyShort(s.amount)}` : "", "."),
-      h("p", { class: "hint" }, s.source === "llm" ? "Разобрано языковой моделью (открытые веса, локально)." : "Разобрано по ключевым словам."),
+      h("p", { class: "suggest-head" }, `Понял задачу: ${s.purpose_title?.toLowerCase()}`, facts ? `, ${facts}` : "", "."),
+      h("p", { class: "hint" }, s.source === "llm" ? "Разобрано языковой моделью (открытые веса, локально)." : "Разобрано по ключевым словам.",
+        " Цель отмечена выше, сумму и срок подставим на следующем шаге."),
       h("ul", { class: "rec-list" }, s.recommendations.map((r) => h("li", { class: r.fit },
         h("strong", {}, r.name), r.fit === "best" ? h("span", { class: "pill pill-good" }, "Подходит лучше всего") : null,
-        h("p", {}, r.reason)))),
-      h("button", { type: "button", class: "btn btn-primary", onclick: () => {
-        d.purpose = s.purpose; if (s.amount) d.amount = s.amount; if (s.term_months) d.term = s.term_months; pickBest(); step = 1; render();
-      } }, "Продолжить с этим продуктом"));
+        h("p", {}, r.reason)))));
   }
 
   function pickBest(): void {
@@ -196,8 +239,7 @@ export async function wizard(root: HTMLElement, user: User, query: URLSearchPara
     const comment = h("textarea", { class: "input", rows: 2, maxlength: 2000, placeholder: "Например: закупка сырья к новогоднему сезону" });
     comment.value = d.comment;
     const cType = h("select", { class: "input" }, h("option", { value: "" }, "Выберите"),
-      ...[["equipment", "Приобретаемое оборудование"], ["vehicle", "Транспорт"], ["real_estate", "Недвижимость"]].map(([v, t]) =>
-        h("option", { value: v, selected: d.collateral_type === v }, t)));
+      ...Object.entries(COLLATERAL).map(([v, t]) => h("option", { value: v, selected: d.collateral_type === v }, t)));
     const cValue = moneyInput("collateral_value", d.collateral_value);
     const save = () => {
       d.revenue_last = readMoney(rl); d.revenue_prev = readMoney(rp); d.debt = readMoney(debt) ?? 0; d.comment = comment.value;
@@ -246,7 +288,7 @@ export async function wizard(root: HTMLElement, user: User, query: URLSearchPara
       ["Выручка за 2025 год", money(d.revenue_last)], ["Выручка за 2024 год", money(d.revenue_prev)],
       ["Платежи по текущим кредитам", money(d.debt)],
     ];
-    if (p.requires_collateral) rows.push(["Залог", `${d.collateral_type ?? "—"}, ${money(d.collateral_value)}`]);
+    if (p.requires_collateral) rows.push(["Залог", collateralText(d.collateral_type, d.collateral_value)]);
     return h("div", {},
       h("h2", {}, "Проверьте заявку"),
       h("dl", { class: "summary" }, rows.map(([k, v]) => [h("dt", {}, k), h("dd", {}, v)])),
@@ -290,12 +332,19 @@ function docsBlock(app: Application, onChange: () => void): HTMLElement {
   const select = h("select", { class: "input" }, Object.entries(types).map(([code, title]) =>
     h("option", { value: code, selected: required.find((r) => !r.uploaded)?.code === code }, title)));
   const file = h("input", { type: "file", class: "input", accept: ".pdf,.jpg,.jpeg,.png,.csv,.xlsx,.xls" });
-  return h("div", { class: "docs" },
+  const removable = ["DRAFT", "NEEDS_INFO"].includes(app.status.code);
+  const box: HTMLElement = h("div", { class: "docs" },
     required.length ? h("ul", { class: "checklist" }, required.map((r) =>
       h("li", { class: r.uploaded ? "ok" : "" }, r.uploaded ? "Загружено: " : "Нужно: ", r.title)))
       : app.status.code === "DRAFT" ? h("p", { class: "notice" }, "Для этой суммы обязательных документов нет — можно сразу отправить заявку.") : null,
     app.documents.length ? h("ul", { class: "doc-list" }, app.documents.map((doc) =>
-      h("li", {}, h("strong", {}, types[doc.doc_type] ?? doc.doc_type), ` — ${doc.filename}, ${Math.ceil(doc.size / 1024)} КБ`))) : null,
+      h("li", {},
+        h("span", { class: "doc-name" }, h("strong", {}, types[doc.doc_type] ?? doc.doc_type), ` — ${doc.filename}, ${Math.ceil(doc.size / 1024)} КБ`),
+        // Убрать ошибочный файл можно, пока банк не начал рассмотрение
+        removable ? actionButton("Удалить", async () => {
+          try { await api.deleteDocument(app.id, doc.id); toast("Документ удалён"); onChange(); }
+          catch (e) { showErrors(box, e); }
+        }, "btn btn-link doc-remove") : null))) : null,
     h("div", { class: "upload-row" },
       field("Тип документа", select, undefined, "doc_type"),
       field("Файл", file, "PDF, JPG, PNG, CSV или XLSX до 10 МБ", "file"),
@@ -305,8 +354,9 @@ function docsBlock(app: Application, onChange: () => void): HTMLElement {
           const f = file.files?.[0];
           if (!f) { toast("Выберите файл", "error"); return; }
           try { await api.upload(app.id, select.value, f); toast("Документ загружен"); onChange(); }
-          catch (e) { showErrors(file.closest(".docs") as HTMLElement, e); }
+          catch (e) { showErrors(box, e); }
         }, "btn btn-secondary"))));
+  return box;
 }
 
 // ============ Карточка заявки ============
@@ -501,6 +551,7 @@ function params(app: Application): HTMLElement {
     h("dt", {}, "Сумма"), h("dd", {}, money(app.amount)), h("dt", {}, "Срок"), h("dd", {}, months(app.term_months)),
     h("dt", {}, "Выручка за 2025 год"), h("dd", {}, money(app.revenue_last_year)),
     h("dt", {}, "Платежи по кредитам"), h("dd", {}, money(app.monthly_debt_payments)),
+    app.collateral_type || app.collateral_value ? [h("dt", {}, "Залог"), h("dd", {}, collateralText(app.collateral_type, app.collateral_value))] : null,
     h("dt", {}, "Документы"), h("dd", {}, app.documents.length ? app.documents.map((d) => d.filename).join(", ") : "нет"));
 }
 
