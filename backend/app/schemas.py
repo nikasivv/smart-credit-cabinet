@@ -1,10 +1,13 @@
 """Контракты API. Из них FastAPI генерирует OpenAPI (/openapi.json, /docs)."""
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from .domain.validation import inn_is_valid
 
 Money = int
 # Верхние границы сумм: защищают от опечаток и переполнения, с запасом выше любого МСБ
@@ -24,6 +27,39 @@ class Problem(BaseModel):
 class LoginIn(BaseModel):
     email: str = Field(examples=["bakery@demo.ru"])
     password: str = Field(examples=["demo12345"])
+
+
+class RegisterIn(BaseModel):
+    """Регистрация клиента: реквизиты компании банк берёт из ЕГРЮЛ/ЕГРИП по ИНН, вручную их не вводят."""
+    inn: str = Field(examples=["5003001259"], description="ИНН компании (10 цифр) или ИП (12 цифр)")
+    full_name: str = Field(min_length=2, max_length=120, examples=["Мария Петрова"])
+    position: str | None = Field(None, max_length=128, examples=["Генеральный директор"])
+    email: str = Field(max_length=255, examples=["maria@company.ru"])
+    password: str = Field(min_length=8, max_length=128)
+
+    @field_validator("inn")
+    @classmethod
+    def _inn(cls, v: str) -> str:
+        v = v.strip()
+        if not inn_is_valid(v):
+            raise ValueError("Проверьте ИНН: 10 цифр для компании или 12 для ИП, с верной контрольной суммой")
+        return v
+
+    @field_validator("email")
+    @classmethod
+    def _email(cls, v: str) -> str:
+        v = v.strip().lower()
+        if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", v):
+            raise ValueError("Проверьте email")
+        return v
+
+    @field_validator("full_name")
+    @classmethod
+    def _name(cls, v: str) -> str:
+        v = " ".join(v.split())
+        if len(v) < 2:
+            raise ValueError("Укажите имя")
+        return v
 
 
 class CompanyOut(BaseModel):

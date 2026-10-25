@@ -4,7 +4,7 @@ import { queuePage, reviewPage } from "./analyst.js";
 import { applicationPage, Cleanup, dashboard, wizard } from "./client.js";
 import { riskPage } from "./risk.js";
 import { initTheme, themeButton } from "./theme.js";
-import { actionButton, field, h, mount, showErrors } from "./ui.js";
+import { actionButton, field, h, mount, showErrors, toast } from "./ui.js";
 
 initTheme();
 
@@ -60,7 +60,8 @@ function loginPage(): void {
       h("p", { class: "lead" }, "Кредиты для бизнеса: от потребности до денег на счёте — в одном кабинете."),
       h("div", { class: "form-error", role: "alert", hidden: true }),
       field("Email", email, undefined, "email"), field("Пароль", password, undefined, "password"),
-      actionButton("Войти", doLogin)),
+      actionButton("Войти", doLogin),
+      h("p", { class: "hint login-switch" }, "Компания ещё не подключена? ", h("a", { href: "#/register" }, "Зарегистрироваться по ИНН"))),
     h("div", { class: "login-demo" },
       h("h2", {}, "Демо-клиенты"),
       h("p", { class: "hint" }, "Каждая компания проходит конвейер по-своему — нажмите, чтобы войти."),
@@ -69,6 +70,53 @@ function loginPage(): void {
       h("div", { class: "demo-grid" }, analystDemo.map(quick)),
       h("p", { class: "hint login-api" }, "Для проверяющих: ",
         h("a", { href: "/docs", target: "_blank", rel: "noopener" }, "описание API в Swagger UI"), ".")));
+  mount(app, box);
+}
+
+const EXAMPLE_INN = "5003001259";   // синтетический корректный ИНН: симулятор реестра сгенерирует для него компанию
+
+function registerPage(): void {
+  const inn = h("input", { class: "input", inputmode: "numeric", maxlength: 12, autocomplete: "off", placeholder: "10 или 12 цифр" });
+  const fullName = h("input", { class: "input", autocomplete: "name", maxlength: 120 });
+  const position = h("input", { class: "input", autocomplete: "organization-title", maxlength: 128, placeholder: "Например, генеральный директор" });
+  const email = h("input", { class: "input", type: "email", autocomplete: "email", maxlength: 255 });
+  const password = h("input", { class: "input", type: "password", autocomplete: "new-password", maxlength: 128 });
+  inn.addEventListener("input", () => { inn.value = inn.value.replace(/\D/g, "").slice(0, 12); });
+  const box = h("div", { class: "login" });
+  const doRegister = async () => {
+    try {
+      const r = await api.register({ inn: inn.value, full_name: fullName.value, position: position.value,
+        email: email.value, password: password.value });
+      setToken(r.access_token); user = r.user;
+      toast(`Компания ${r.user.company?.name ?? ""} подключена`);
+      navigate("#/");
+    } catch (e) { showErrors(box, e); }
+  };
+  password.addEventListener("keydown", (e) => { if (e.key === "Enter") doRegister(); });
+  box.append(
+    h("div", { class: "login-form" },
+      h("h1", {}, "Регистрация"),
+      h("p", { class: "lead" }, "Подключите компанию к кредитному кабинету — реквизиты вводить не нужно."),
+      h("div", { class: "form-error", role: "alert", hidden: true }),
+      field("ИНН компании или ИП", inn, "Название, форму бизнеса и ОКВЭД банк возьмёт из ЕГРЮЛ/ЕГРИП", "inn"),
+      field("Ваше имя", fullName, undefined, "full_name"),
+      field("Должность (необязательно)", position, undefined, "position"),
+      field("Email", email, "Будет логином для входа", "email"),
+      field("Пароль", password, "Не меньше 8 символов", "password"),
+      actionButton("Зарегистрироваться", doRegister),
+      h("p", { class: "hint login-switch" }, "Уже есть аккаунт? ", h("a", { href: "#/login" }, "Войти"))),
+    h("div", { class: "login-demo" },
+      h("h2", {}, "Как это работает"),
+      h("ol", { class: "reg-steps" },
+        h("li", {}, "Вы вводите ИНН — банк сам запрашивает название, форму бизнеса, ОКВЭД и регион в реестре."),
+        h("li", {}, "Сразу после регистрации открывается кабинет: можно подбирать продукт и подавать заявку."),
+        h("li", {}, "Выручку, налоги и кредитную историю банк проверит при рассмотрении заявки — в ФНС и бюро кредитных историй.")),
+      h("div", { class: "panel reg-example" },
+        h("strong", {}, "Для проверки"),
+        h("p", {}, "Подойдёт любой корректный ИНН: внешние источники здесь — симулятор, он сгенерирует данные компании. ",
+          "Демо-компании со страницы входа уже подключены и повторно не регистрируются."),
+        h("button", { type: "button", class: "btn btn-secondary", onclick: () => { inn.value = EXAMPLE_INN; fullName.focus(); } },
+          `Подставить пример: ${EXAMPLE_INN}`))));
   mount(app, box);
 }
 
@@ -87,7 +135,7 @@ async function route(): Promise<void> {
     if (gen !== routeGen) return;
   }
   renderHeader();
-  if (!user) { lastPage = ""; loginPage(); return; }
+  if (!user) { lastPage = ""; if (parts[0] === "register") registerPage(); else loginPage(); return; }
 
   // Новая страница строится в отдельном контейнере и заменяет старую, только когда готова.
   // Пока она грузится, старая остаётся на экране; «Загружаем…» — лишь если ждать дольше 400 мс.

@@ -77,6 +77,8 @@ async function request<T>(method: string, path: string, body?: unknown, headers:
 
 export const api = {
   login: (email: string, password: string) => request<{ access_token: string; user: User }>("POST", "/api/auth/login", { email, password }),
+  register: (body: { inn: string; full_name: string; position: string; email: string; password: string }) =>
+    request<{ access_token: string; user: User }>("POST", "/api/auth/register", body),
   me: () => request<User>("GET", "/api/auth/me"),
   catalog: () => request<Catalog>("GET", "/api/catalog"),
   calc: (product_code: string, amount: number, term_months: number) =>

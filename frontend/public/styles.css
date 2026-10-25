@@ -303,3 +303,8 @@ main[aria-busy="true"] .view { opacity: .55; transition: opacity .15s ease; poin
 .audit td:nth-child(4) { min-width: 260px; }
 .audit td:nth-child(2) a { white-space: nowrap; }
 .audit-more { margin-top: 14px; }
+
+/* Регистрация по ИНН */
+.login-switch { margin-top: 14px; text-align: center; }
+.reg-steps { padding-left: 20px; margin: 8px 0 18px; display: grid; gap: 8px; color: var(--ink); }
+.reg-example p { margin: 6px 0 12px; color: var(--muted); }

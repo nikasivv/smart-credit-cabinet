@@ -91,6 +91,13 @@ def _num(v) -> str:
     return f"{v:,}".replace(",", " ") if isinstance(v, (int, float)) else str(v)
 
 
+def _chars(n) -> str:
+    """«1 символ», «2 символа», «5 символов»."""
+    n = int(n or 0)
+    w = "символ" if n % 10 == 1 and n % 100 != 11 else "символа" if 2 <= n % 10 <= 4 and not 12 <= n % 100 <= 14 else "символов"
+    return f"{n} {w}"
+
+
 def _ru(err: dict) -> str:
     """Сообщения проверки данных по-русски: интерфейс показывает их у полей формы."""
     t, ctx = err.get("type", ""), err.get("ctx") or {}
@@ -111,9 +118,9 @@ def _ru(err: dict) -> str:
     if t == "less_than_equal":
         return f"Не больше {_num(ctx.get('le'))}"
     if t == "string_too_short":
-        return f"Минимум {ctx.get('min_length')} символов"
+        return f"Минимум {_chars(ctx.get('min_length'))}"
     if t == "string_too_long":
-        return f"Не длиннее {ctx.get('max_length')} символов"
+        return f"Не длиннее {_chars(ctx.get('max_length'))}"
     if t == "string_type":
         return "Введите текст"
     if t in ("enum", "literal_error"):

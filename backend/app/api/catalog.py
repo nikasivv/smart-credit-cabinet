@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -7,11 +9,15 @@ from sqlalchemy.orm import Session
 from ..db import get_db
 from ..domain.policy import make_offer
 from ..domain.products import DOCUMENTS, PRODUCT_CATALOG_VERSION, PRODUCTS, PURPOSES
-from ..errors import ValidationFailed
-from ..models import User
-from ..schemas import CalcIn, CalcOut, CatalogOut, LoginIn, ProductOut, PurposeOut, SuggestIn, TokenOut, UserOut
-from ..security import create_token, current_user, verify_password
+from ..errors import Conflict, ServiceUnavailable, ValidationFailed
+from ..integrations.gateway import IntegrationUnavailable, NotFoundInSource, get_gateway
+from ..models import Company, User
+from ..schemas import (CalcIn, CalcOut, CatalogOut, LoginIn, ProductOut, PurposeOut, RegisterIn, SuggestIn, TokenOut,
+                       UserOut)
+from ..security import create_token, current_user, hash_password, mask_inn, verify_password
 from ..services import assistant
+
+log = logging.getLogger("scc.auth")
 
 auth = APIRouter(prefix="/api/auth", tags=["auth"])
 catalog = APIRouter(prefix="/api", tags=["catalog"])
@@ -22,6 +28,40 @@ def login(body: LoginIn, db: Session = Depends(get_db)):
     user = db.scalar(select(User).where(User.email == body.email.strip().lower()))
     if user is None or not verify_password(body.password, user.password_hash):
         raise HTTPException(401, detail="Неверный email или пароль")
+    return TokenOut(access_token=create_token(user), user=UserOut.model_validate(user))
+
+
+@auth.post("/register", response_model=TokenOut, status_code=201, summary="Регистрация клиента по ИНН")
+def register(body: RegisterIn, db: Session = Depends(get_db)):
+    """Название, форму бизнеса, ОКВЭД и регион банк берёт из ЕГРЮЛ/ЕГРИП — клиент вводит только ИНН и контакты.
+    После регистрации пользователь сразу входит в кабинет."""
+    if db.scalar(select(User).where(User.email == body.email)):
+        raise Conflict("Пользователь с таким email уже есть — войдите", code="email_taken",
+                       details=[{"field": "email", "message": "Этот email уже зарегистрирован"}])
+    company = db.scalar(select(Company).where(Company.inn == body.inn))
+    if company and db.scalar(select(User).where(User.company_id == company.id)):
+        raise Conflict("Компания уже подключена к кабинету — войдите под её аккаунтом", code="company_taken",
+                       details=[{"field": "inn", "message": "Компания с этим ИНН уже зарегистрирована"}])
+    if company is None:
+        try:
+            e, _ = get_gateway().egrul(body.inn)
+        except NotFoundInSource:
+            raise ValidationFailed("Компания не найдена", details=[
+                {"field": "inn", "message": "Компании с таким ИНН нет в ЕГРЮЛ/ЕГРИП"}])
+        except IntegrationUnavailable:
+            raise ServiceUnavailable("Реестр ЕГРЮЛ/ЕГРИП сейчас не отвечает — попробуйте через минуту")
+        ip = len(body.inn) == 12
+        company = Company(inn=body.inn, legal_form=e.get("legal_form") or ("IP" if ip else "OOO"),
+                          name=e.get("name") or f"{'ИП' if ip else 'ООО'} с ИНН {body.inn}",
+                          okved=e.get("okved"), okved_name=e.get("okved_name"), region=e.get("region"))
+        db.add(company)
+        db.flush()
+    user = User(email=body.email, password_hash=hash_password(body.password), full_name=body.full_name,
+                position=body.position or None, role="CLIENT", company_id=company.id)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    log.info("client_registered inn=%s user_id=%s", mask_inn(body.inn), user.id)
     return TokenOut(access_token=create_token(user), user=UserOut.model_validate(user))
 
 
