@@ -7,7 +7,7 @@ from app.domain.state_machine import (TransitionError, all_statuses_reachable, a
                                       check_transition)
 from app.domain.statuses import STATUS_INFO, Actor, Status
 from app.domain.validation import (ApplicationData, completeness_check, inn_is_valid,
-                                   revenue_discrepancy, validate_for_submit)
+                                   revenue_discrepancy, sanity_check, validate_for_submit)
 
 
 def make_input(**kw) -> ScoringInput:
@@ -67,6 +67,24 @@ def test_submit_validation_checks_product_ranges():
                            revenue_last_year=10_000_000, revenue_prev_year=None, monthly_debt_payments=0)
     codes = {(i.field, i.code) for i in validate_for_submit(data, p)}
     assert ("amount", "out_of_range") in codes and ("term_months", "out_of_range") in codes
+
+
+def test_sanity_catches_typos_in_figures():
+    def codes(**kw):
+        base = dict(product_code="WORKING_CAPITAL", amount=1_100_000, term_months=12, purpose="new_point",
+                    revenue_last_year=48_000_000, revenue_prev_year=41_000_000, monthly_debt_payments=80_000)
+        base.update(kw)
+        return {(i.field, i.code) for i in sanity_check(ApplicationData(**base))}
+    assert codes() == set()
+    assert ("revenue_last_year", "implausible") in codes(revenue_last_year=13)              # ввели в миллионах
+    assert ("revenue_prev_year", "implausible") in codes(revenue_prev_year=41_000)
+    assert codes(revenue_prev_year=0) == set()                                               # новый бизнес — можно 0
+    assert ("monthly_debt_payments", "exceeds_revenue") in codes(monthly_debt_payments=122_121_122)
+    assert codes(revenue_last_year=None, monthly_debt_payments=None) == set()               # пустое — не сюда
+    # При отправке опечатка тоже блокирует, и поле не дублируется ошибкой «обязательно»
+    data = ApplicationData("WORKING_CAPITAL", 1_100_000, 12, "inventory", 13, None, 0)
+    issues = [i for i in validate_for_submit(data, PRODUCTS["WORKING_CAPITAL"]) if i.field == "revenue_last_year"]
+    assert [i.code for i in issues] == ["implausible"]
 
 
 def test_investment_requires_collateral_and_documents():

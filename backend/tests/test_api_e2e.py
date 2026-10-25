@@ -59,6 +59,24 @@ def test_s3_revenue_mismatch_requests_documents(client):
     assert r["offer"]["amount"] < 3_000_000
 
 
+def test_s3b_investment_collateral_fixed_in_info_response(client):
+    """Инвестиционный кредит: нет документов и залог ниже 70% суммы — клиент догружает документы и поднимает оценку."""
+    h = login(client, "bakery@demo.ru")
+    app = create(client, h, product_code="INVESTMENT", purpose="equipment", amount=1_100_000, term_months=12,
+                 collateral_type="equipment", collateral_value=500_000)
+    r = client.post(f"/api/applications/{app['id']}/submit", headers=h).json()
+    assert r["status"]["code"] == "NEEDS_INFO"
+    codes = {i["code"] for i in r["info_request"]["items"]}
+    assert {"missing_document", "insufficient_collateral"} <= codes
+    for doc in ("collateral_docs", "contract"):
+        up = client.post(f"/api/applications/{app['id']}/documents", data={"doc_type": doc}, files={"file": PDF}, headers=h)
+        assert up.status_code == 201, up.text
+    r = client.post(f"/api/applications/{app['id']}/info-response",
+                    json={"message": "Оценка уточнена", "collateral_value": 900_000}, headers=h).json()
+    assert r["collateral_value"] == 900_000
+    assert r["status"]["code"] not in ("NEEDS_INFO", "VALIDATION"), r["status"]
+
+
 def test_s4_manual_review_and_analyst_decision(client):
     h = login(client, "coffee@demo.ru")
     app = create(client, h, product_code="EXPRESS", purpose="urgent", amount=1_500_000, term_months=18,
@@ -131,6 +149,24 @@ def test_validation_errors_are_field_level(client):
     assert r.status_code == 422
     fields = {d["field"] for d in r.json()["details"]}
     assert {"amount", "term_months"} <= fields
+
+
+def test_implausible_figures_rejected_on_save(client):
+    """Выручка «13 ₽» и платежи больше выручки — ошибка сразу при сохранении шага, а не дозапрос банка."""
+    h = login(client, "bakery@demo.ru")
+    body = {"product_code": "WORKING_CAPITAL", "purpose": "inventory", "amount": 1_100_000, "term_months": 12,
+            "revenue_last_year": 13, "monthly_debt_payments": 122_121_122}
+    r = client.post("/api/applications", json=body, headers=h)
+    assert r.status_code == 422
+    assert {d["field"] for d in r.json()["details"]} == {"revenue_last_year"}
+    app = create(client, h)
+    r = client.patch(f"/api/applications/{app['id']}", headers=h,
+                     json={"monthly_debt_payments": 122_121_122, "version": app["version"]})
+    assert r.status_code == 422
+    assert r.json()["details"][0]["field"] == "monthly_debt_payments"
+    assert "больше выручки" in r.json()["details"][0]["message"]
+    # Черновик не изменился
+    assert client.get(f"/api/applications/{app['id']}", headers=h).json()["monthly_debt_payments"] == 80_000
 
 
 def test_draft_optimistic_lock(client):

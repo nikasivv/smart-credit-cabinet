@@ -209,7 +209,7 @@ export async function wizard(root: HTMLElement, user: User, query: URLSearchPara
         h("strong", {}, user.company?.name ?? ""), h("span", {}, `ИНН ${user.company?.inn} · ${user.company?.okved_name ?? ""}`),
         h("span", { class: "hint" }, "Регистрационные данные банк проверит в ЕГРЮЛ/ЕГРИП сам — вводить их не нужно.")),
       h("div", { class: "two-col" },
-        field("Выручка за 2025 год", rl, "Из декларации или отчётности", "revenue_last_year"),
+        field("Выручка за 2025 год", rl, "В рублях, полностью — из декларации или отчётности", "revenue_last_year"),
         field("Выручка за 2024 год", rp, "Если бизнес моложе — оставьте пустым", "revenue_prev_year")),
       field("Платежи по текущим кредитам и лизингу в месяц", debt, "0, если кредитов нет", "monthly_debt_payments"),
       p.requires_collateral ? h("div", { class: "two-col" },
@@ -383,17 +383,26 @@ export async function applicationPage(root: HTMLElement, user: User, id: string)
   function infoRequestBlock(app: Application): HTMLElement {
     const req = app.info_request!;
     const msg = h("textarea", { class: "input", rows: 2, maxlength: 2000, placeholder: "Комментарий для банка (необязательно)" });
-    const needsRevenue = (req.items ?? []).some((i) => i.field === "revenue_last_year");
+    const items = req.items ?? [];
+    const needsRevenue = items.some((i) => i.field === "revenue_last_year");
+    const needsCollateral = items.some((i) => i.field === "collateral_value");
     const rev = moneyInput("revenue_last_year", app.revenue_last_year);
+    const coll = moneyInput("collateral_value", app.collateral_value);
+    // Недостающие документы со статусом «Нужно / Загружено» показывает блок документов ниже — здесь их не дублируем
+    const notes = items.filter((i) => !i.field?.startsWith("documents."));
     return h("div", { class: "panel panel-attention" },
       h("h3", {}, req.requested_by_type === "ANALYST" ? "Специалист банка просит уточнить" : "Банку не хватает сведений"),
       h("p", {}, req.message),
-      h("ul", { class: "checklist" }, (req.items ?? []).map((i) => h("li", {}, i.message))),
+      notes.length ? h("ul", { class: "checklist" }, notes.map((i) => h("li", {}, i.message))) : null,
       docsBlock(app, () => { lastKey = ""; load(); }),
       needsRevenue ? field("Выручка за 2025 год", rev, "Исправьте, если ошиблись, или оставьте и приложите отчётность", "revenue_last_year") : null,
+      needsCollateral ? field("Оценочная стоимость залога", coll,
+        `Не менее 70% суммы кредита — от ${money(Math.ceil((app.amount ?? 0) * 0.7))}`, "collateral_value") : null,
       field("Ответ", msg, undefined, "message"),
       h("div", { class: "row-actions" }, actionButton("Отправить ответ", () => act(() =>
-        api.infoResponse(app.id, { message: msg.value || null, revenue_last_year: needsRevenue ? readMoney(rev) : null }), "Ответ отправлен"))));
+        api.infoResponse(app.id, { message: msg.value || null,
+          revenue_last_year: needsRevenue ? readMoney(rev) : null,
+          collateral_value: needsCollateral ? readMoney(coll) : null }), "Ответ отправлен"))));
   }
 
   function offerBlock(app: Application): HTMLElement {

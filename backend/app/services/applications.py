@@ -17,7 +17,7 @@ from ..domain.policy import make_offer
 from ..domain.products import DOCUMENTS, PRODUCTS, PURPOSES, required_documents
 from ..domain.state_machine import TransitionError, check_transition
 from ..domain.statuses import STATUS_INFO, Actor, Status
-from ..domain.validation import ApplicationData, validate_for_submit
+from ..domain.validation import ApplicationData, sanity_check, validate_for_submit
 from ..errors import Conflict, NotFound, ValidationFailed
 from ..models import Application, ApplicationEvent, Document, InfoRequest, Job, User
 
@@ -106,6 +106,14 @@ def _new_number() -> str:
     return f"SCC-{now():%y%m%d}-{secrets.token_hex(3).upper()}"
 
 
+def _check_sanity(app: Application) -> None:
+    """Опечатки в цифрах показываем сразу, на том шаге, где их ввели."""
+    issues = sanity_check(to_data(app))
+    if issues:
+        raise ValidationFailed("Проверьте цифры",
+                               [{"field": i.field, "code": i.code, "message": i.message} for i in issues])
+
+
 def create_draft(db: Session, user: User, fields: dict, idempotency_key: str | None) -> Application:
     if idempotency_key:
         existing = db.scalar(select(Application).where(Application.idempotency_key == idempotency_key))
@@ -122,6 +130,7 @@ def create_draft(db: Session, user: User, fields: dict, idempotency_key: str | N
     for k in EDITABLE_FIELDS:
         if k in fields:
             setattr(app, k, fields[k])
+    _check_sanity(app)
     db.add(app)
     db.flush()
     log_event(db, app, "STATUS", Actor.CLIENT, user.id, "Черновик заявки создан", to_status=Status.DRAFT.value)
@@ -138,6 +147,7 @@ def update_draft(db: Session, user: User, app: Application, fields: dict, expect
     for k in EDITABLE_FIELDS:
         if k in fields:
             setattr(app, k, fields[k])
+    _check_sanity(app)
     return app
 
 
@@ -194,6 +204,7 @@ def answer_info_request(db: Session, user: User, app: Application, response_text
     for k in ("revenue_last_year", "revenue_prev_year", "monthly_debt_payments", "collateral_value"):
         if fields.get(k) is not None:
             setattr(app, k, fields[k])
+    _check_sanity(app)
     req = open_info_request(db, app)
     if req:
         req.status, req.response_text, req.answered_at = "ANSWERED", response_text, now()
