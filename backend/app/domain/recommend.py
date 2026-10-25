@@ -23,26 +23,51 @@ KEYWORDS: dict[str, tuple[str, ...]] = {
     "inventory": ("закуп", "товар", "сырь", "партию", "сезон", "склад"),
     "contract": ("контракт", "госзаказ", "тендер", "заказ", "44-фз", "223"),
     "payroll": ("зарплат", "налог", "аванс сотрудник"),
-    "equipment": ("оборудован", "станок", "печь", "печи", "машин", "автомоб", "транспорт", "техник", "грузовик"),
+    "equipment": ("оборудован", "станок", "печь", "печи", "машин", "автомоб", "транспорт", "техник", "грузовик",
+                  "фургон", "газел", "тягач", "погрузчик", "трактор", "автопарк", "парк"),
     "expansion": ("точк", "филиал", "открыть", "ремонт", "помещен", "расшир"),
     "urgent": ("срочно", "быстро", "небольш"),
 }
 
 
-def purpose_from_text(text: str) -> str | None:
+def purpose_scores(text: str) -> dict[str, int]:
+    """Сколько ключевых слов каждой цели нашлось в тексте."""
     t = text.lower()
-    scores = {code: sum(1 for kw in kws if kw in t) for code, kws in KEYWORDS.items()}
+    return {code: sum(1 for kw in kws if kw in t) for code, kws in KEYWORDS.items()}
+
+
+def purpose_from_text(text: str) -> str | None:
+    scores = purpose_scores(text)
     best = max(scores, key=scores.get)
     return best if scores[best] > 0 else None
 
 
+_UNIT = r"(млн|миллион\w*|тыс\w*|к\b)"
+
+
+def _scale(unit: str) -> int:
+    return 1_000_000 if unit.startswith("м") else 1_000
+
+
 def amount_from_text(text: str) -> int | None:
+    """Сумма из текста: «3 млн», «2,5 миллиона», «800 тыс.», «тысяч 800», «полтора миллиона»."""
     t = text.lower().replace("\u00a0", " ")
-    m = re.search(r"(\d+(?:[.,]\d+)?)\s*(млн|миллион|тыс|к\b)", t)
-    if not m:
-        return None
-    n = float(m.group(1).replace(",", "."))
-    return int(n * (1_000_000 if m.group(2).startswith("м") else 1_000))
+    m = re.search(r"(\d+(?:[.,]\d+)?)\s*" + _UNIT, t)                 # число перед единицей
+    if m:
+        return int(float(m.group(1).replace(",", ".")) * _scale(m.group(2)))
+    m = re.search(_UNIT + r"\s*(\d+(?:[.,]\d+)?)", t)                 # «тысяч 800», «миллиона 2»
+    if m:
+        return int(float(m.group(2).replace(",", ".")) * _scale(m.group(1)))
+    m = re.search(r"пол(?:тор|утор)\w*\s+" + _UNIT, t)                          # «полтора миллиона», «полутора млн»
+    if m:
+        return int(1.5 * _scale(m.group(1)))
+    return None
+
+
+def mentions_amount(text: str) -> bool:
+    """Есть ли в тексте хоть какой-то признак суммы — цифры или слова-единицы."""
+    t = text.lower()
+    return bool(re.search(r"\d", t) or re.search(r"млн|миллион|тыс|полтор|полутор|сто\s|двести|триста|пятьсот|рубл|₽", t))
 
 
 def recommend(purpose: str, amount: int | None = None) -> list[Recommendation]:
