@@ -85,6 +85,48 @@
         }
       }
     },
+    "/api/auth/register": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Регистрация клиента по ИНН",
+        "description": "Название, форму бизнеса, ОКВЭД и регион банк берёт из ЕГРЮЛ/ЕГРИП — клиент вводит только ИНН и контакты.\nПосле регистрации пользователь сразу входит в кабинет.",
+        "operationId": "register_api_auth_register_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/me": {
       "get": {
         "tags": [
@@ -1207,12 +1249,25 @@
             }
           },
           {
+            "name": "hidden_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Только события, скрытые от клиента",
+              "default": false,
+              "title": "Hidden Only"
+            },
+            "description": "Только события, скрытые от клиента"
+          },
+          {
             "name": "limit",
             "in": "query",
             "required": false,
             "schema": {
               "type": "integer",
               "maximum": 500,
+              "minimum": 1,
               "default": 100,
               "title": "Limit"
             }
@@ -1226,7 +1281,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/EventOut"
+                    "$ref": "#/components/schemas/AuditEventOut"
                   },
                   "title": "Response Audit Api Admin Audit Get"
                 }
@@ -2080,6 +2135,109 @@
         "type": "object",
         "title": "ApplicationPatch"
       },
+      "AuditEventOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "from_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Status"
+          },
+          "to_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Status"
+          },
+          "actor_type": {
+            "type": "string",
+            "title": "Actor Type"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "payload": {
+            "anyOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payload"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "application_id": {
+            "type": "string",
+            "title": "Application Id"
+          },
+          "application_number": {
+            "type": "string",
+            "title": "Application Number"
+          },
+          "company_name": {
+            "type": "string",
+            "title": "Company Name"
+          },
+          "actor_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Name"
+          },
+          "visible_to_client": {
+            "type": "boolean",
+            "title": "Visible To Client"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "from_status",
+          "to_status",
+          "actor_type",
+          "message",
+          "payload",
+          "created_at",
+          "application_id",
+          "application_number",
+          "company_name",
+          "actor_name",
+          "visible_to_client"
+        ],
+        "title": "AuditEventOut",
+        "description": "Событие журнала с контекстом для аудита: какая заявка, чья, кто действовал, видел ли клиент."
+      },
       "Body_upload_document_api_applications__app_id__documents_post": {
         "properties": {
           "doc_type": {
@@ -2787,6 +2945,65 @@
           "reasons"
         ],
         "title": "QueueItem"
+      },
+      "RegisterIn": {
+        "properties": {
+          "inn": {
+            "type": "string",
+            "title": "Inn",
+            "description": "ИНН компании (10 цифр) или ИП (12 цифр)",
+            "examples": [
+              "5003001259"
+            ]
+          },
+          "full_name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 2,
+            "title": "Full Name",
+            "examples": [
+              "Мария Петрова"
+            ]
+          },
+          "position": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position",
+            "examples": [
+              "Генеральный директор"
+            ]
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 255,
+            "title": "Email",
+            "examples": [
+              "maria@company.ru"
+            ]
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 8,
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "inn",
+          "full_name",
+          "email",
+          "password"
+        ],
+        "title": "RegisterIn",
+        "description": "Регистрация клиента: реквизиты компании банк берёт из ЕГРЮЛ/ЕГРИП по ИНН, вручную их не вводят."
       },
       "SignIn": {
         "properties": {
