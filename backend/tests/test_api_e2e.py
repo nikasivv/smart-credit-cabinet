@@ -185,3 +185,27 @@ def test_validation_messages_in_russian(client):
     r = client.post("/api/applications", headers=h, json={"product_code": "WORKING_CAPITAL", "purpose": "inventory",
                                                           "amount": "много", "term_months": 12})
     assert {d["field"]: d["message"] for d in r.json()["details"]}["amount"] == "Введите целое число"
+
+
+def test_risk_manager_policy_and_audit(client):
+    """Риск-менеджер видит политику и аудит с контекстом, но не может принимать решения; клиенту это закрыто."""
+    hc = login(client, "bakery@demo.ru")
+    a = client.post("/api/applications", headers=hc, json={
+        "product_code": "WORKING_CAPITAL", "purpose": "inventory", "amount": 3_000_000, "term_months": 24,
+        "revenue_last_year": 48_000_000, "revenue_prev_year": 41_000_000, "monthly_debt_payments": 80_000}).json()
+    client.post(f"/api/applications/{a['id']}/submit", headers=hc)
+
+    hr = login(client, "risk@alfa.demo", "risk12345")
+    pol = client.get("/api/admin/policy", headers=hr).json()
+    assert pol["auto_decision_limit"] == 15_000_000 and pol["min_dscr"] == 1.25
+    assert pol["products"]["WORKING_CAPITAL"]["name"] and pol["industry_risk"]["10"]["margin"] > 0
+
+    audit = client.get("/api/admin/audit?limit=50", headers=hr).json()
+    mine = [e for e in audit if e["application_id"] == a["id"]]
+    assert mine and all(e["company_name"] == "ООО «Северная пекарня»" and e["application_number"] for e in mine)
+    assert any(e["actor_type"] == "CLIENT" and e["actor_name"] for e in mine)
+    hidden = client.get("/api/admin/audit?hidden_only=true", headers=hr).json()
+    assert all(not e["visible_to_client"] for e in hidden)
+
+    assert client.post(f"/api/analyst/applications/{a['id']}/assign", headers=hr).status_code == 403
+    assert client.get("/api/admin/audit", headers=hc).status_code == 403

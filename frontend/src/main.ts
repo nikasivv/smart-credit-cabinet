@@ -2,6 +2,7 @@ import { analystDemo, clientDemo } from "./demo.js";
 import { api, ApiError, hasToken, setToken, setUnauthorizedHandler, User } from "./api.js";
 import { queuePage, reviewPage } from "./analyst.js";
 import { applicationPage, Cleanup, dashboard, wizard } from "./client.js";
+import { riskPage } from "./risk.js";
 import { initTheme, themeButton } from "./theme.js";
 import { actionButton, field, h, mount, showErrors } from "./ui.js";
 
@@ -30,7 +31,8 @@ function renderHeader(): void {
     h("a", { class: "brand", href: "#/" }, h("span", { class: "brand-mark" }, "А"), isClient ? "Кредитный кабинет" : "Кредитный конвейер"),
     h("nav", { class: "top-nav", "aria-label": "Основное меню" },
       isClient ? [h("a", { href: "#/" }, "Главная")]
-        : [h("a", { href: "#/queue/manual" }, "Очередь")]),
+        : [h("a", { href: "#/queue/manual" }, "Очередь"),
+          user.role === "RISK_ADMIN" ? h("a", { href: "#/risk" }, "Политика и аудит") : null]),
     h("div", { class: "who" },
       h("span", {}, user.company?.name ?? user.full_name),
       h("button", { type: "button", class: "btn btn-link", onclick: () => { setToken(null); user = null; navigate("#/login"); } }, "Выйти"),
@@ -45,7 +47,7 @@ function loginPage(): void {
     try {
       const r = await api.login(email.value, password.value);
       setToken(r.access_token); user = r.user;
-      navigate(user.role === "CLIENT" ? "#/" : "#/queue/manual");
+      navigate(user.role === "CLIENT" ? "#/" : user.role === "RISK_ADMIN" ? "#/risk" : "#/queue/manual");
     } catch (e) { showErrors(box, e); }
   };
   const quick = (who: { email: string; password: string; title: string; text: string }) =>
@@ -106,6 +108,7 @@ async function route(): Promise<void> {
       else c = await dashboard(view, user);
     } else {
       if (parts[0] === "review" && parts[1]) c = await reviewPage(view, user, parts[1]);
+      else if (parts[0] === "risk" && user.role === "RISK_ADMIN") c = await riskPage(view, user);
       else c = await queuePage(view, user, ["manual", "active", "all"].includes(parts[1]) ? parts[1] : "manual");
     }
     clearTimeout(slow);

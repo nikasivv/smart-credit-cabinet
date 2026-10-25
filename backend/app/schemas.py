@@ -144,6 +144,15 @@ class EventOut(BaseModel):
     created_at: datetime
 
 
+class AuditEventOut(EventOut):
+    """Событие журнала с контекстом для аудита: какая заявка, чья, кто действовал, видел ли клиент."""
+    application_id: str
+    application_number: str
+    company_name: str
+    actor_name: str | None
+    visible_to_client: bool
+
+
 class StatusView(BaseModel):
     code: str
     title: str

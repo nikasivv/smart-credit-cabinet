@@ -6,14 +6,15 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
+from ..config import get_settings
 from ..db import get_db
 from ..domain import policy, scoring
 from ..domain.products import PRODUCTS
 from ..domain.state_machine import to_mermaid
 from ..domain.statuses import STATUS_INFO, Status
 from ..models import Application, ApplicationEvent, Job, User
-from ..schemas import (AnalystApplicationOut, AnalystDecisionIn, AnalystInfoRequestIn, CompanyOut, EventOut,
-                       QueueItem)
+from ..schemas import (AnalystApplicationOut, AnalystDecisionIn, AnalystInfoRequestIn, AuditEventOut, CompanyOut,
+                       EventOut, QueueItem)
 from ..security import ROLE_ANALYST, ROLE_RISK, require_roles
 from ..services import applications as svc
 from ..services.assistant import analyst_summary
@@ -109,13 +110,24 @@ def stats(db: Session = Depends(get_db), _: User = Depends(bank_staff)):
 
 # ---------- администрирование и аудит ----------
 
-@admin.get("/audit", response_model=list[EventOut], summary="Журнал событий (аудит)")
-def audit(application_id: str | None = None, limit: int = Query(100, le=500), db: Session = Depends(get_db),
-          _: User = Depends(risk_only)):
+@admin.get("/audit", response_model=list[AuditEventOut], summary="Журнал событий (аудит)")
+def audit(application_id: str | None = None, hidden_only: bool = Query(False, description="Только события, скрытые от клиента"),
+          limit: int = Query(100, ge=1, le=500), db: Session = Depends(get_db), _: User = Depends(risk_only)):
     q = select(ApplicationEvent).order_by(ApplicationEvent.id.desc()).limit(limit)
     if application_id:
         q = q.where(ApplicationEvent.application_id == application_id)
-    return list(db.scalars(q))
+    if hidden_only:
+        q = q.where(ApplicationEvent.visible_to_client.is_(False))
+    events = list(db.scalars(q))
+    apps = {a.id: a for a in db.scalars(select(Application).where(Application.id.in_({e.application_id for e in events})))}
+    actor_ids = {e.actor_id for e in events if e.actor_id}
+    users = {u.id: u for u in db.scalars(select(User).where(User.id.in_(actor_ids)))} if actor_ids else {}
+    return [AuditEventOut(
+        id=e.id, kind=e.kind, from_status=e.from_status, to_status=e.to_status, actor_type=e.actor_type,
+        message=e.message, payload=e.payload, created_at=e.created_at, application_id=e.application_id,
+        application_number=apps[e.application_id].number, company_name=apps[e.application_id].company.name,
+        actor_name=users[e.actor_id].full_name if e.actor_id in users else None,
+        visible_to_client=e.visible_to_client) for e in events]
 
 
 @admin.get("/jobs", summary="Состояние очереди задач")
@@ -132,10 +144,14 @@ def get_policy(_: User = Depends(risk_only)):
         "policy_version": policy.POLICY_VERSION, "scorecard_version": scoring.SCORECARD_VERSION,
         "base_score": scoring.BASE_SCORE,
         "grades": [{"min_score": lo, "grade": g, "pd": pd} for lo, g, pd in scoring.GRADES],
-        "auto_decision_limit": policy.AUTO_DECISION_LIMIT, "min_dscr": policy.MIN_DSCR,
+        # Порог берётся из настроек — тот же, что использует конвейер (AUTO_DECISION_LIMIT)
+        "auto_decision_limit": get_settings().auto_decision_limit, "min_dscr": policy.MIN_DSCR,
+        "counter_min_share": policy.COUNTER_MIN_SHARE,
         "grade_rate_premium": policy.GRADE_RATE_PREMIUM, "grade_limit_multiplier": policy.GRADE_LIMIT_MULT,
-        "products": {c: {"base_rate": p.base_rate, "revenue_share": p.revenue_share,
-                         "min_amount": p.min_amount, "max_amount": p.max_amount} for c, p in PRODUCTS.items()},
+        "products": {c: {"name": p.name, "base_rate": p.base_rate, "revenue_share": p.revenue_share,
+                         "min_amount": p.min_amount, "max_amount": p.max_amount, "min_term": p.min_term,
+                         "max_term": p.max_term} for c, p in PRODUCTS.items()},
+        "industry_risk": {k: {"risk": r, "margin": m} for k, (r, m) in scoring.INDUSTRY_RISK.items()},
         "state_diagram_mermaid": to_mermaid(),
     }
 

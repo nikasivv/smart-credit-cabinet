@@ -25,6 +25,15 @@ export interface AppEvent { id: number; kind: string; from_status: string | null
 export interface FeedItem { id: string; kind: "action" | "offer" | "event" | "tip"; title: string; body: string; reason: string; date: string; application_id?: string; product_code?: string; amount?: number; }
 export interface Feed { items: FeedItem[]; }
 export interface Suggestion { source: "llm" | "rules" | "form"; purpose: string | null; purpose_title?: string; amount: number | null; term_months: number | null; recommendations: { product_code: string; name: string; fit: "best" | "alternative"; reason: string }[]; message: string | null; }
+export interface AuditEvent extends AppEvent { application_id: string; application_number: string; company_name: string; actor_name: string | null; visible_to_client: boolean; }
+export interface Policy {
+  policy_version: string; scorecard_version: string; base_score: number;
+  grades: { min_score: number; grade: string; pd: number }[];
+  auto_decision_limit: number; min_dscr: number; counter_min_share: number;
+  grade_rate_premium: Record<string, number>; grade_limit_multiplier: Record<string, number>;
+  products: Record<string, { name: string; base_rate: number; revenue_share: number; min_amount: number; max_amount: number; min_term: number; max_term: number }>;
+  industry_risk: Record<string, { risk: "low" | "medium" | "high"; margin: number }>;
+}
 export interface QueueItem { id: string; number: string; company_name: string; company_inn: string; product_name: string; amount: number | null; term_months: number | null; status: string; status_title: string; grade: string | null; score: number | null; analyst_id: number | null; analyst_name: string | null; submitted_at: string | null; waiting_minutes: number | null; reasons: string[]; }
 export interface AnalystCard { application: Application; company: Company; applicant: { full_name: string; position: string | null; email: string }; enrichment: Record<string, any> | null; scoring: Record<string, any> | null; decision: Record<string, any> | null; summary: string[]; events: AppEvent[]; analyst_id: number | null; }
 
@@ -94,6 +103,9 @@ export const api = {
   decide: (id: string, body: Record<string, unknown>) => request<{ ok: boolean; status: string }>("POST", `/api/analyst/applications/${id}/decision`, body),
   requestInfo: (id: string, message: string, documents: string[]) => request<{ ok: boolean }>("POST", `/api/analyst/applications/${id}/request-info`, { message, documents }),
   stats: () => request<{ by_status: Record<string, { count: number; title: string }>; auto_share: number | null; auto_decisions: number; manual_reviews: number }>("GET", "/api/analyst/stats"),
+  policy: () => request<Policy>("GET", "/api/admin/policy"),
+  audit: (hiddenOnly: boolean, limit: number) => request<AuditEvent[]>("GET", `/api/admin/audit?limit=${limit}${hiddenOnly ? "&hidden_only=true" : ""}`),
+  jobs: () => request<{ counts: Record<string, number>; failed: { id: number; kind: string; application_id: string; attempts: number; error: string | null }[] }>("GET", "/api/admin/jobs"),
   chaos: () => request<{ fail_rate: number; latency_ms: number; sources: string[] }>("GET", "/api/admin/integrations/chaos"),
   setChaos: (fail_rate: number) => request<{ fail_rate: number }>("POST", "/api/admin/integrations/chaos", { fail_rate }),
 };

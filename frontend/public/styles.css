@@ -287,3 +287,17 @@ select.input option { padding: 8px 12px; }
 
 /* Переключение вкладок: пока грузятся новые данные, старые видны притушёнными */
 main[aria-busy="true"] .view { opacity: .55; transition: opacity .15s ease; pointer-events: none; }
+
+/* Рабочее место риск-менеджера */
+.risk-cols { align-items: start; }
+.risk-params { margin-top: 16px; }
+.audit-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.audit-head h2 { margin: 0; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 3px; background: var(--surface-2); }
+.seg-btn { border: 0; background: transparent; color: var(--muted); font: inherit; font-size: .9rem; padding: 6px 14px; border-radius: 999px; cursor: pointer; }
+.seg-btn.active { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: 0 0 0 1px var(--line); }
+.nowrap { white-space: nowrap; }
+.risk { font-weight: 600; } .risk-low { color: var(--good); } .risk-medium { color: var(--attn); } .risk-high { color: var(--bad); }
+.audit td:nth-child(4) { min-width: 260px; }
+.audit td:nth-child(2) a { white-space: nowrap; }
+.audit-more { margin-top: 14px; }
