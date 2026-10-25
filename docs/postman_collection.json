@@ -2,7 +2,7 @@
   "info": {
     "name": "Умный кредитный кабинет — API",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Запускайте папки по порядку (Runner). Переменные коллекции заполняются автоматически. baseUrl по умолчанию — http://localhost:8000. Между отправкой и проверкой решения выдержите несколько секунд: заявку обрабатывает воркер."
+    "description": "Запускайте папки по порядку (Runner). Переменные коллекции заполняются автоматически. baseUrl по умолчанию — http://localhost:8000. Между отправкой и проверкой решения выдержите несколько секунд: заявку обрабатывает воркер. Папка 5 при каждом запуске генерирует новый ИНН и email, поэтому её можно запускать повторно; папке 6 нужен manual_id из папки 2."
   },
   "variable": [
     {
@@ -23,6 +23,22 @@
     },
     {
       "key": "manual_id",
+      "value": ""
+    },
+    {
+      "key": "token_new",
+      "value": ""
+    },
+    {
+      "key": "new_inn",
+      "value": ""
+    },
+    {
+      "key": "new_email",
+      "value": ""
+    },
+    {
+      "key": "token_risk",
       "value": ""
     }
   ],
@@ -1289,6 +1305,52 @@
           ]
         },
         {
+          "name": "Ошибки проверки — по-русски (422)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_client}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/applications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "applications"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_code\": \"WORKING_CAPITAL\",\n  \"purpose\": \"inventory\",\n  \"amount\": \"много\",\n  \"term_months\": 12,\n  \"revenue_last_year\": 900000000000000\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('422', () => pm.response.to.have.status(422));",
+                  "const m = Object.fromEntries(pm.response.json().details.map(d => [d.field, d.message]));",
+                  "pm.test('сообщения у полей по-русски', () => {",
+                  "  pm.expect(m.amount).to.eql('Введите целое число');",
+                  "  pm.expect(m.revenue_last_year).to.eql('Не больше 100 000 000 000');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Вход: analyst@alfa.demo",
           "request": {
             "method": "POST",
@@ -1390,6 +1452,506 @@
               "raw": "{\n  \"fail_rate\": 0\n}"
             }
           }
+        }
+      ]
+    },
+    {
+      "name": "5. Регистрация клиента по ИНН",
+      "item": [
+        {
+          "name": "Регистрация: новая компания",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"inn\": \"{{new_inn}}\",\n  \"full_name\": \"Мария Петрова\",\n  \"position\": \"Генеральный директор\",\n  \"email\": \"{{new_email}}\",\n  \"password\": \"secret-123\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Каждый запуск — новый синтетический ИНН с верной контрольной суммой и новый email, чтобы коллекцию можно было гонять повторно",
+                  "const base = '50' + String(Math.floor(Math.random() * 1e7)).padStart(7, '0');",
+                  "const k = [2, 4, 10, 3, 5, 9, 4, 6, 8];",
+                  "const check = base.split('').reduce((s, c, i) => s + Number(c) * k[i], 0) % 11 % 10;",
+                  "pm.collectionVariables.set('new_inn', base + check);",
+                  "pm.collectionVariables.set('new_email', 'demo-' + Date.now() + '@example.ru');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201', () => pm.response.to.have.status(201));",
+                  "const b = pm.response.json();",
+                  "pm.test('реквизиты взяты из ЕГРЮЛ/ЕГРИП', () => {",
+                  "  pm.expect(b.user.company.inn).to.eql(pm.collectionVariables.get('new_inn'));",
+                  "  pm.expect(b.user.company.name).to.be.a('string').and.not.empty;",
+                  "  pm.expect(b.user.role).to.eql('CLIENT');",
+                  "});",
+                  "pm.collectionVariables.set('token_new', b.access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Профиль новой компании",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_new}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "me"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('тот же ИНН', () => pm.expect(pm.response.json().company.inn).to.eql(pm.collectionVariables.get('new_inn')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Новая компания подаёт заявку",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_new}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/applications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "applications"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_code\": \"WORKING_CAPITAL\",\n  \"purpose\": \"inventory\",\n  \"amount\": 1000000,\n  \"term_months\": 12,\n  \"revenue_last_year\": 30000000,\n  \"monthly_debt_payments\": 0\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Повторная регистрация компании — 409",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"inn\": \"{{new_inn}}\",\n  \"full_name\": \"Иван Иванов\",\n  \"email\": \"second-{{new_email}}\",\n  \"password\": \"secret-123\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('409', () => pm.response.to.have.status(409));",
+                  "pm.test('company_taken', () => pm.expect(pm.response.json().code).to.eql('company_taken'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ИНН демо-компании — 409",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"inn\": \"7708123450\",\n  \"full_name\": \"Иван Иванов\",\n  \"email\": \"bakery-copy@example.ru\",\n  \"password\": \"secret-123\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('409', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Неверный ИНН и пароль — 422 по-русски",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"inn\": \"1234567890\",\n  \"full_name\": \"Иван Иванов\",\n  \"email\": \"bad@example.ru\",\n  \"password\": \"123\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('422', () => pm.response.to.have.status(422));",
+                  "const m = Object.fromEntries(pm.response.json().details.map(d => [d.field, d.message]));",
+                  "pm.test('ошибки у полей', () => {",
+                  "  pm.expect(m.inn).to.include('Проверьте ИНН');",
+                  "  pm.expect(m.password).to.eql('Минимум 8 символов');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6. Риск-менеджер: политика и аудит",
+      "item": [
+        {
+          "name": "Вход: risk@alfa.demo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"risk@alfa.demo\",\n  \"password\": \"risk12345\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('token_risk', pm.response.json().access_token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Кредитная политика",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_risk}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/policy",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "policy"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "const p = pm.response.json();",
+                  "pm.test('параметры политики', () => {",
+                  "  pm.expect(p.min_dscr).to.eql(1.25);",
+                  "  pm.expect(p.products.WORKING_CAPITAL.name).to.be.a('string');",
+                  "  pm.expect(p.industry_risk).to.have.property('10');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Журнал аудита с контекстом",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_risk}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/audit?limit=30",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "audit"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "30"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('у событий есть заявка и компания', () => pm.response.json().forEach(e => {",
+                  "  pm.expect(e.application_number).to.be.a('string');",
+                  "  pm.expect(e.company_name).to.be.a('string');",
+                  "}));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Аудит: только внутренние события",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_risk}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/audit?hidden_only=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "audit"
+              ],
+              "query": [
+                {
+                  "key": "hidden_only",
+                  "value": "true"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('все скрыты от клиента', () => pm.response.json().forEach(e => pm.expect(e.visible_to_client).to.eql(false)));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Очередь задач конвейера",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_risk}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/jobs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "jobs"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200', () => pm.response.to.have.status(200));",
+                  "pm.test('есть счётчики', () => pm.expect(pm.response.json()).to.have.property('counts'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Риск-менеджер не принимает решения — 403",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token_risk}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/analyst/applications/{{manual_id}}/assign",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "analyst",
+                "applications",
+                "{{manual_id}}",
+                "assign"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
         }
       ]
     }
