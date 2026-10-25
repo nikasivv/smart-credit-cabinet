@@ -47,7 +47,8 @@ export const dateOnly = (iso: string): string => new Date(iso).toLocaleDateStrin
 /** Ввод сумм: цифры с пробелами-разделителями, значение — целое число. */
 export function moneyInput(name: string, value: number | null, placeholder = ""): HTMLInputElement {
   const input = h("input", { name, inputmode: "numeric", autocomplete: "off", placeholder, class: "input money" });
-  const fmt = (raw: string) => { const d = raw.replace(/\D/g, ""); return d ? nf.format(Number(d)) : ""; };
+  // Не больше 15 цифр (сотни миллиардов): дальше — заведомая опечатка, а JS теряет точность после 2^53
+  const fmt = (raw: string) => { const d = raw.replace(/\D/g, "").slice(0, 15); return d ? nf.format(Number(d)) : ""; };
   input.value = value !== null && value !== undefined ? nf.format(value) : "";
   input.addEventListener("input", () => {
     const pos = input.value.length - (input.selectionStart ?? input.value.length);

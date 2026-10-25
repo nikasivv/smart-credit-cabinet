@@ -21,9 +21,11 @@ function current(): Theme {
 
 function label(btn: HTMLButtonElement): void {
   const dark = current() === "dark";
-  btn.replaceChildren(h("span", { class: "tt-icon", "aria-hidden": "true" }, dark ? "☀" : "☾"),
-    h("span", { class: "tt-text" }, dark ? "Светлая тема" : "Тёмная тема"));
-  btn.setAttribute("aria-label", dark ? "Включить светлую тему" : "Включить тёмную тему");
+  // Второстепенный элемент — только значок, подпись в подсказке и для экранных читалок
+  const text = dark ? "Включить светлую тему" : "Включить тёмную тему";
+  btn.replaceChildren(h("span", { class: "tt-icon", "aria-hidden": "true" }, dark ? "☀" : "☾"));
+  btn.setAttribute("aria-label", text);
+  btn.title = text;
 }
 
 /** Вызвать один раз при старте, до первой отрисовки. */

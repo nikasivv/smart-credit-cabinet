@@ -44,7 +44,9 @@ main.wrap { padding-top: 28px; padding-bottom: 64px; }
 .brand-mark { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; background: var(--red); color: #fff; font-weight: 800; }
 .top-nav { display: flex; gap: 20px; } .top-nav a { text-decoration: none; color: var(--muted); } .top-nav a:hover { color: var(--ink); }
 .who { margin-left: auto; display: flex; gap: 12px; align-items: center; color: var(--muted); font-size: .92rem; }
-.btn-link.theme-toggle { text-decoration: none; white-space: nowrap; gap: 6px; } .btn-link.theme-toggle:hover { color: var(--ink); }
+.btn-link.theme-toggle { text-decoration: none; width: 32px; height: 32px; border-radius: 50%; margin-left: 4px; }
+.btn-link.theme-toggle:hover { color: var(--ink); background: var(--surface-2); }
+.theme-toggle .tt-icon { font-size: 1.1rem; line-height: 1; }
 
 /* Кнопки и поля */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 20px; border-radius: 999px;
@@ -267,9 +269,11 @@ select.input option { padding: 8px 12px; }
   .factors li, .bars li { grid-template-columns: 1fr; }
   .app-row { grid-template-columns: 1fr auto; } .app-row .pill { grid-column: 1 / -1; justify-self: start; }
   .who > span { display: none; }
-  .theme-toggle .tt-text { display: none; } .theme-toggle .tt-icon { font-size: 1.15rem; }
 }
 @media (max-width: 480px) {
+  /* Шапка в одну строку: логотип и так ведёт на главную, пункт меню не нужен */
+  .topbar-inner { gap: 12px; flex-wrap: nowrap; }
+  .top-nav { display: none; }
   /* На телефоне подписан только текущий этап, остальные подписи — для экранных читалок */
   .route-step:not([aria-current]) .route-name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .route-step[aria-current] { font-size: .85rem; }

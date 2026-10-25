@@ -7,6 +7,9 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 Money = int
+# Верхние границы сумм: защищают от опечаток и переполнения, с запасом выше любого МСБ
+MAX_REVENUE = 100_000_000_000
+MAX_MONTHLY_DEBT = 10_000_000_000
 
 
 class Problem(BaseModel):
@@ -82,7 +85,7 @@ class CatalogOut(BaseModel):
 
 class CalcIn(BaseModel):
     product_code: str
-    amount: Money = Field(gt=0)
+    amount: Money = Field(gt=0, le=1_000_000_000)
     term_months: int = Field(gt=0, le=120)
 
 
@@ -96,7 +99,7 @@ class CalcOut(BaseModel):
 class SuggestIn(BaseModel):
     text: str | None = Field(None, max_length=1000, examples=["Нужно купить новую печь для пекарни, примерно 2,5 млн"])
     purpose: str | None = None
-    amount: Money | None = None
+    amount: Money | None = Field(None, ge=0, le=1_000_000_000)
 
 
 # ---------- заявки ----------
@@ -107,11 +110,11 @@ class ApplicationIn(BaseModel):
     purpose_comment: str | None = Field(None, max_length=2000)
     amount: Money | None = Field(None, ge=0, le=1_000_000_000)
     term_months: int | None = Field(None, ge=1, le=120)
-    revenue_last_year: Money | None = Field(None, ge=0)
-    revenue_prev_year: Money | None = Field(None, ge=0)
-    monthly_debt_payments: Money | None = Field(None, ge=0)
+    revenue_last_year: Money | None = Field(None, ge=0, le=MAX_REVENUE)
+    revenue_prev_year: Money | None = Field(None, ge=0, le=MAX_REVENUE)
+    monthly_debt_payments: Money | None = Field(None, ge=0, le=MAX_MONTHLY_DEBT)
     collateral_type: str | None = Field(None, max_length=64)
-    collateral_value: Money | None = Field(None, ge=0)
+    collateral_value: Money | None = Field(None, ge=0, le=MAX_REVENUE)
 
 
 class ApplicationPatch(ApplicationIn):
@@ -194,10 +197,10 @@ class ApplicationOut(BaseModel):
 
 class InfoResponseIn(BaseModel):
     message: str | None = Field(None, max_length=2000)
-    revenue_last_year: Money | None = Field(None, ge=0)
-    revenue_prev_year: Money | None = Field(None, ge=0)
-    monthly_debt_payments: Money | None = Field(None, ge=0)
-    collateral_value: Money | None = Field(None, ge=0)
+    revenue_last_year: Money | None = Field(None, ge=0, le=MAX_REVENUE)
+    revenue_prev_year: Money | None = Field(None, ge=0, le=MAX_REVENUE)
+    monthly_debt_payments: Money | None = Field(None, ge=0, le=MAX_MONTHLY_DEBT)
+    collateral_value: Money | None = Field(None, ge=0, le=MAX_REVENUE)
 
 
 class SignIn(BaseModel):
@@ -245,7 +248,7 @@ class AnalystApplicationOut(BaseModel):
 class AnalystDecisionIn(BaseModel):
     outcome: Literal["APPROVED", "COUNTER_OFFER", "REJECTED"]
     comment: str = Field(min_length=5, max_length=2000, description="Обоснование — увидит клиент")
-    amount: Money | None = Field(None, gt=0)
+    amount: Money | None = Field(None, gt=0, le=1_000_000_000)
     term_months: int | None = Field(None, gt=0, le=120)
     rate: float | None = Field(None, gt=0, lt=100)
 

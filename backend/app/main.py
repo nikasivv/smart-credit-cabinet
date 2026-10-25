@@ -74,18 +74,60 @@ async def app_error(_: Request, e: AppError):
     return _problem(e.status_code, e.code, e.message, e.details)
 
 
+_HTTP_RU = {"Not Found": "Не найдено", "Method Not Allowed": "Метод не поддерживается",
+            "Not authenticated": "Требуется вход в систему", "Forbidden": "Недостаточно прав"}
+
+
 @app.exception_handler(HTTPException)
 async def http_error(_: Request, e: HTTPException):
     code = {401: "unauthorized", 403: "forbidden", 404: "not_found"}.get(e.status_code, "http_error")
-    resp = _problem(e.status_code, code, str(e.detail))
+    resp = _problem(e.status_code, code, _HTTP_RU.get(str(e.detail), str(e.detail)))
     if e.headers:
         resp.headers.update(e.headers)
     return resp
 
 
+def _num(v) -> str:
+    return f"{v:,}".replace(",", " ") if isinstance(v, (int, float)) else str(v)
+
+
+def _ru(err: dict) -> str:
+    """Сообщения проверки данных по-русски: интерфейс показывает их у полей формы."""
+    t, ctx = err.get("type", ""), err.get("ctx") or {}
+    if t == "missing":
+        return "Обязательное поле"
+    if t == "int_parsing_size":
+        return "Слишком большое число"
+    if t.startswith("int_") or t == "int_type":
+        return "Введите целое число"
+    if t.startswith("float_"):
+        return "Введите число"
+    if t == "greater_than":
+        return f"Должно быть больше {_num(ctx.get('gt'))}"
+    if t == "greater_than_equal":
+        return f"Не меньше {_num(ctx.get('ge'))}"
+    if t == "less_than":
+        return f"Должно быть меньше {_num(ctx.get('lt'))}"
+    if t == "less_than_equal":
+        return f"Не больше {_num(ctx.get('le'))}"
+    if t == "string_too_short":
+        return f"Минимум {ctx.get('min_length')} символов"
+    if t == "string_too_long":
+        return f"Не длиннее {ctx.get('max_length')} символов"
+    if t == "string_type":
+        return "Введите текст"
+    if t in ("enum", "literal_error"):
+        return "Недопустимое значение"
+    if t == "json_invalid":
+        return "Некорректный формат запроса"
+    if t == "value_error":
+        return str(err.get("msg", "")).removeprefix("Value error, ") or "Некорректное значение"
+    return "Некорректное значение"
+
+
 @app.exception_handler(RequestValidationError)
 async def validation_error(_: Request, e: RequestValidationError):
-    details = [{"field": ".".join(str(x) for x in err["loc"][1:]), "message": err["msg"]} for err in e.errors()]
+    details = [{"field": ".".join(str(x) for x in err["loc"][1:]), "message": _ru(err)} for err in e.errors()]
     return _problem(422, "validation_failed", "Проверьте введённые данные", details)
 
 

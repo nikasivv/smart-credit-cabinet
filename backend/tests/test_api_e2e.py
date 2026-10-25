@@ -170,3 +170,18 @@ def test_catalog_calculator_and_suggest(client):
 
 def test_health(client):
     assert client.get("/health/ready").json()["db"] == "ok"
+
+
+def test_validation_messages_in_russian(client):
+    h = login(client, "agro@demo.ru")
+    r = client.post("/api/applications", headers=h, json={
+        "product_code": "WORKING_CAPITAL", "purpose": "inventory", "amount": 1_000_000, "term_months": 12,
+        "revenue_prev_year": 9_877_777_777_777_776_000_000_000_000_000_000, "term_months_extra": "x"})
+    assert r.status_code == 422
+    body = r.json()
+    assert body["message"] == "Проверьте введённые данные"
+    msgs = {d["field"]: d["message"] for d in body["details"]}
+    assert msgs["revenue_prev_year"] == "Не больше 100 000 000 000"
+    r = client.post("/api/applications", headers=h, json={"product_code": "WORKING_CAPITAL", "purpose": "inventory",
+                                                          "amount": "много", "term_months": 12})
+    assert {d["field"]: d["message"] for d in r.json()["details"]}["amount"] == "Введите целое число"

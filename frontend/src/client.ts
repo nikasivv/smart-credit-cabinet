@@ -30,8 +30,7 @@ export async function dashboard(root: HTMLElement, user: User): Promise<Cleanup>
       h("section", { "aria-labelledby": "apps-h" },
         h("h2", { id: "apps-h" }, "Заявки"),
         active.length ? h("div", { class: "app-list" }, active.map(appRow))
-          : emptyState("Активных заявок нет", "Расскажите, на что нужны деньги, — подберём продукт и рассчитаем платёж.",
-            h("a", { class: "btn btn-secondary", href: "#/new" }, "Подобрать продукт")),
+          : emptyState("Активных заявок нет", "Нажмите «Получить финансирование» — подберём продукт под вашу задачу и рассчитаем платёж."),
         closed.length ? h("details", { class: "closed-apps" },
           h("summary", {}, `Завершённые заявки (${closed.length})`), h("div", { class: "app-list" }, closed.map(appRow))) : null),
       feedView(feed)));

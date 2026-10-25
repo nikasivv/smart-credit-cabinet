@@ -4,6 +4,7 @@ import { queuePage, reviewPage } from "./analyst.js";
 import { applicationPage, Cleanup, dashboard, wizard } from "./client.js";
 import { initTheme, themeButton } from "./theme.js";
 import { actionButton, field, h, mount, showErrors } from "./ui.js";
+
 initTheme();
 
 const app = document.getElementById("app")!;
@@ -28,12 +29,12 @@ function renderHeader(): void {
   header.replaceChildren(
     h("a", { class: "brand", href: "#/" }, h("span", { class: "brand-mark" }, "А"), isClient ? "Кредитный кабинет" : "Кредитный конвейер"),
     h("nav", { class: "top-nav", "aria-label": "Основное меню" },
-      isClient ? [h("a", { href: "#/" }, "Главная"), h("a", { href: "#/new" }, "Новая заявка")]
+      isClient ? [h("a", { href: "#/" }, "Главная")]
         : [h("a", { href: "#/queue/manual" }, "Очередь")]),
     h("div", { class: "who" },
-      themeButton(),
       h("span", {}, user.company?.name ?? user.full_name),
-      h("button", { type: "button", class: "btn btn-link", onclick: () => { setToken(null); user = null; navigate("#/login"); } }, "Выйти")));
+      h("button", { type: "button", class: "btn btn-link", onclick: () => { setToken(null); user = null; navigate("#/login"); } }, "Выйти"),
+      themeButton()));
 }
 
 function loginPage(): void {
