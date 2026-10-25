@@ -5,15 +5,41 @@ x-prod-env: &prod-env
   APP_ENV: production
   JWT_SECRET: ${JWT_SECRET:?Задайте JWT_SECRET в файле .env}
 
+# Проверки здоровья с запасом по времени: на ВМ с долевым процессором (free tier, 10% vCPU)
+# запуск Python занимает секунды, и короткий таймаут ошибочно признал бы сервис упавшим.
+x-slow-check: &slow-check
+  interval: 15s
+  timeout: 20s
+  retries: 10
+  start_period: 180s
+
 services:
+  db:
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scc -d scc"]
+      <<: *slow-check
   web:
     ports: !override ["80:8080"]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz || exit 1"]
+      <<: *slow-check
   api:
     ports: !reset []
     environment: *prod-env
+    # Один процесс uvicorn вместо двух: на демо-нагрузке хватает, памяти и процессора уходит меньше
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--no-server-header"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live')"]
+      <<: *slow-check
   worker:
     environment: *prod-env
+    healthcheck:
+      test: ["CMD", "python", "-m", "app.worker", "--healthcheck"]
+      <<: *slow-check
   migrate:
     environment: *prod-env
   mocks:
     ports: !reset []
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/health')"]
+      <<: *slow-check
