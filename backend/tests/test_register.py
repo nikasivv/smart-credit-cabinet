@@ -38,6 +38,10 @@ def test_register_creates_company_from_registry_and_logs_in(client, monkeypatch)
     assert again.status_code == 409 and again.json()["code"] == "company_taken"
     dup = client.post("/api/auth/register", json=_form(inn="7705008121", email="maria@example.ru"))
     assert dup.status_code == 409 and dup.json()["code"] == "email_taken"
+    # Занят и email, и компания — обе ошибки в одном ответе, а не по очереди
+    both = client.post("/api/auth/register", json=_form(email="maria@example.ru"))
+    assert both.status_code == 409 and both.json()["code"] == "already_registered"
+    assert {d["field"] for d in both.json()["details"]} == {"email", "inn"}
 
 
 def test_register_rejects_demo_company_and_bad_input(client):
@@ -49,12 +53,17 @@ def test_register_rejects_demo_company_and_bad_input(client):
     assert msgs["inn"].startswith("Проверьте ИНН")
     assert msgs["email"] == "Проверьте email"
     assert msgs["password"] == "Минимум 8 символов"
+    digits = client.post("/api/auth/register", json=_form(full_name="123", email="d@example.ru"))
+    assert digits.status_code == 422 and "буквами" in digits.json()["details"][0]["message"]
 
 
 def test_register_registry_not_found_and_unavailable(client, gateway):
     nf = client.post("/api/auth/register", json=_form(inn="6311004584", email="nf@example.ru"))
     assert nf.status_code == 422
     assert nf.json()["details"][0] == {"field": "inn", "message": "Компании с таким ИНН нет в ЕГРЮЛ/ЕГРИП"}
+    # Email занят и ИНН нет в реестре — тоже обе ошибки сразу
+    combo = client.post("/api/auth/register", json=_form(inn="6311004584", email="bakery@demo.ru"))
+    assert combo.status_code == 409 and {d["field"] for d in combo.json()["details"]} == {"email", "inn"}
     gateway.down = {"egrul"}
     down = client.post("/api/auth/register", json=_form(inn="7705008121", email="down@example.ru"))
     assert down.status_code == 503 and "не отвечает" in down.json()["message"]

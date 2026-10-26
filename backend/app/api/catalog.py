@@ -35,21 +35,36 @@ def login(body: LoginIn, db: Session = Depends(get_db)):
 def register(body: RegisterIn, db: Session = Depends(get_db)):
     """Название, форму бизнеса, ОКВЭД и регион банк берёт из ЕГРЮЛ/ЕГРИП — клиент вводит только ИНН и контакты.
     После регистрации пользователь сразу входит в кабинет."""
+    # Все проблемы показываем разом, а не по одной за попытку: занятый email, занятая компания, нет в реестре
+    conflicts: list[dict] = []
+    codes: list[str] = []
     if db.scalar(select(User).where(User.email == body.email)):
-        raise Conflict("Пользователь с таким email уже есть — войдите", code="email_taken",
-                       details=[{"field": "email", "message": "Этот email уже зарегистрирован"}])
+        conflicts.append({"field": "email", "message": "Этот email уже зарегистрирован"})
+        codes.append("email_taken")
     company = db.scalar(select(Company).where(Company.inn == body.inn))
     if company and db.scalar(select(User).where(User.company_id == company.id)):
-        raise Conflict("Компания уже подключена к кабинету — войдите под её аккаунтом", code="company_taken",
-                       details=[{"field": "inn", "message": "Компания с этим ИНН уже зарегистрирована"}])
+        conflicts.append({"field": "inn", "message": "Компания с этим ИНН уже зарегистрирована"})
+        codes.append("company_taken")
+    registry: dict | None = None
+    registry_error: dict | None = None
     if company is None:
         try:
-            e, _ = get_gateway().egrul(body.inn)
+            registry, _ = get_gateway().egrul(body.inn)
         except NotFoundInSource:
-            raise ValidationFailed("Компания не найдена", details=[
-                {"field": "inn", "message": "Компании с таким ИНН нет в ЕГРЮЛ/ЕГРИП"}])
+            registry_error = {"field": "inn", "message": "Компании с таким ИНН нет в ЕГРЮЛ/ЕГРИП"}
         except IntegrationUnavailable:
-            raise ServiceUnavailable("Реестр ЕГРЮЛ/ЕГРИП сейчас не отвечает — попробуйте через минуту")
+            if not conflicts:
+                raise ServiceUnavailable("Реестр ЕГРЮЛ/ЕГРИП сейчас не отвечает — попробуйте через минуту")
+    if conflicts:
+        message = {("email_taken",): "Пользователь с таким email уже есть — войдите",
+                   ("company_taken",): "Компания уже подключена к кабинету — войдите под её аккаунтом"}.get(
+            tuple(codes), "Email и компания уже зарегистрированы — войдите под существующим аккаунтом")
+        raise Conflict(message, code=codes[0] if len(codes) == 1 else "already_registered",
+                       details=conflicts + ([registry_error] if registry_error else []))
+    if registry_error:
+        raise ValidationFailed("Компания не найдена", details=[registry_error])
+    if company is None:
+        e = registry or {}
         ip = len(body.inn) == 12
         company = Company(inn=body.inn, legal_form=e.get("legal_form") or ("IP" if ip else "OOO"),
                           name=e.get("name") or f"{'ИП' if ip else 'ООО'} с ИНН {body.inn}",

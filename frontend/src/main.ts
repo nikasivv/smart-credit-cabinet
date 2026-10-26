@@ -73,6 +73,27 @@ function loginPage(): void {
   mount(app, box);
 }
 
+/** Контрольные цифры ИНН — та же проверка, что на сервере, чтобы показать ошибку сразу. */
+function innValid(inn: string): boolean {
+  if (!/^\d{10}$|^\d{12}$/.test(inn)) return false;
+  const d = [...inn].map(Number);
+  const check = (k: number[]) => k.reduce((s, x, i) => s + x * d[i], 0) % 11 % 10;
+  if (inn.length === 10) return check([2, 4, 10, 3, 5, 9, 4, 6, 8]) === d[9];
+  return check([7, 2, 4, 10, 3, 5, 9, 4, 6, 8]) === d[10] && check([3, 7, 2, 4, 10, 3, 5, 9, 4, 6, 8]) === d[11];
+}
+
+/** Ошибки формата всех полей сразу, ещё до запроса к серверу. Занятость email и ИНН проверит сервер. */
+function registrationErrors(f: { inn: string; full_name: string; email: string; password: string }): { field: string; message: string }[] {
+  const out: { field: string; message: string }[] = [];
+  if (!innValid(f.inn)) out.push({ field: "inn", message: "Проверьте ИНН: 10 цифр для компании или 12 для ИП, с верной контрольной суммой" });
+  const name = f.full_name.trim();
+  if (name.length < 2) out.push({ field: "full_name", message: "Укажите имя" });
+  else if (!/[A-Za-zА-Яа-яЁё]/.test(name)) out.push({ field: "full_name", message: "Укажите имя буквами, например: Мария Петрова" });
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(f.email.trim())) out.push({ field: "email", message: "Проверьте email" });
+  if (f.password.length < 8) out.push({ field: "password", message: "Минимум 8 символов" });
+  return out;
+}
+
 const EXAMPLE_INN = "5003001259";   // синтетический корректный ИНН: симулятор реестра сгенерирует для него компанию
 
 function registerPage(): void {
@@ -85,8 +106,10 @@ function registerPage(): void {
   const box = h("div", { class: "login" });
   const doRegister = async () => {
     try {
-      const r = await api.register({ inn: inn.value, full_name: fullName.value, position: position.value,
-        email: email.value, password: password.value });
+      const form = { inn: inn.value, full_name: fullName.value, email: email.value, password: password.value };
+      const local = registrationErrors(form);
+      if (local.length) throw new ApiError(422, "validation_failed", "Проверьте поля формы", local);
+      const r = await api.register({ ...form, position: position.value });
       setToken(r.access_token); user = r.user;
       toast(`Компания ${r.user.company?.name ?? ""} подключена`);
       navigate("#/");

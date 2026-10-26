@@ -59,6 +59,8 @@ class RegisterIn(BaseModel):
         v = " ".join(v.split())
         if len(v) < 2:
             raise ValueError("Укажите имя")
+        if not re.search(r"[A-Za-zА-Яа-яЁё]", v):
+            raise ValueError("Укажите имя буквами, например: Мария Петрова")
         return v
 
 
